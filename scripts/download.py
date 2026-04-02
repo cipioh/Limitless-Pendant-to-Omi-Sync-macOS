@@ -2026,6 +2026,7 @@ async def main(argv: list[str] | None = None) -> int:
 
             oldest_page = int(storage_status.get("oldest_flash_page", 0))
             newest_page = int(storage_status.get("newest_flash_page", -1))
+            storage_session = storage_status.get("current_storage_session")
 
             if newest_page < oldest_page:
                 print("No unacknowledged data on the pendant. You're all caught up!", flush=True)
@@ -2038,6 +2039,8 @@ async def main(argv: list[str] | None = None) -> int:
 
             print(f"Oldest Flash Page: {oldest_page}", flush=True)
             print(f"Newest Flash Page: {newest_page}", flush=True)
+            if storage_session is not None:
+                print(f"Session ID: {storage_session}", flush=True)
 
             # Stop the download before it starts if under 50 pages.
             # Small backlogs are left to accumulate on the pendant to avoid creating
