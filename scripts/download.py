@@ -2040,8 +2040,6 @@ async def main(argv: list[str] | None = None) -> int:
             print(f"Oldest Flash Page: {oldest_page}", flush=True)
             print(f"Newest Flash Page: {newest_page}", flush=True)
             if storage_session is not None:
-                print(f"Session ID: {storage_session}", flush=True)
-
                 # Session health check: compare with previous sync's session ID.
                 # During healthy recording the session ID advances ~30-60 times per hour
                 # (the pendant creates a new session on every speech pause via VAD).
