@@ -102,9 +102,10 @@ before uploading to the Omi API:
   while (missing a scheduled sync) and triggers an immediate catch-up sync, without waiting
   for the next scheduled hour.
 - **Conversation-aware segmentation** — audio is automatically split into individual files at
-  recording boundaries (start/stop markers embedded in the pendant's data stream). Each
-  distinct conversation becomes its own file, transcript, and Omi timeline entry rather than
-  one long undifferentiated audio blob.
+  natural silence gaps (60+ seconds between timestamps). Each distinct conversation becomes
+  its own file, transcript, and Omi timeline entry rather than one long undifferentiated
+  audio blob. See [Conversation Segmentation](#conversation-segmentation) for why this
+  approach was chosen over the pendant's own session and start/stop markers.
 - **Drain-and-convert chunking** — safely processes large backlogs in stable 2,000-page chunks,
   converting each before pulling the next. Prevents Bluetooth timeouts on large downloads.
 - **Natural gap chunking** — when a chunk is large, the script looks for a natural 60-second
@@ -253,6 +254,7 @@ All settings live in `.env` at the project root. Copy `.env.example` as your sta
 | `SYNCED_WAV_ACTION` | `keep` | What to do with WAV files after a successful upload: `keep` (move to `synced_to_omi/`) or `delete` |
 | `SYNCED_WAV_RETENTION_DAYS` | `7` | Days before WAV files in `synced_to_omi/` are auto-deleted. `0` = keep forever. |
 | `SYNCED_JSON_RETENTION_DAYS` | `7` | Days before JSON payload archives in `synced_to_omi/` are auto-deleted. `0` = keep forever. |
+| `PENDANT_HEALTH_MONITORING` | `disabled` | Set to `enabled` if you use always-on continuous recording. Fires a persistent alert if the pendant silently stops recording. |
 
 ---
 
@@ -360,6 +362,41 @@ To run in non-destructive read-only mode, add `--no-ack` when calling `download.
 
 ---
 
+## Conversation Segmentation
+
+The Limitless Pendant embeds three potential signals that could be used to split audio into
+separate conversations. All three were evaluated before settling on the current approach.
+
+**Signal 1 — `did_start_recording` / `did_stop_recording` flags**
+Each flash page contains per-chunk Opus encoding markers embedded in the binary stream.
+These flags change on every Opus encoding boundary — roughly every 2–3 pages (a few seconds
+of audio). They fire constantly throughout a recording and are not meaningful as conversation
+boundaries; they reflect the internal audio encoder lifecycle, not user-level sessions.
+
+**Signal 2 — Session ID**
+The pendant increments its internal session counter on every VAD (Voice Activity Detection)
+event — i.e., every time you pause speaking, even briefly. During an active conversation, the
+session ID advances 30–200+ times per hour. Splitting on session ID changes would produce
+dozens of tiny files per hour and fragment conversations at every breath.
+
+The session ID *does* have one genuine use: as a recording health proxy. Because it advances
+predictably during active speech, a counter that hasn't moved in 30+ minutes is a reliable
+signal that the pendant has silently stopped recording. This is what
+`PENDANT_HEALTH_MONITORING` uses.
+
+**Signal 3 — Timestamp gap (current implementation)**
+Each flash page carries a millisecond-precision timestamp. A gap of 60+ seconds between
+consecutive page timestamps means the pendant was genuinely silent (or not recording) for
+that period — a natural conversation boundary. This correctly captures the transition between
+meetings, lunch breaks, end of day, and so on, without generating false splits during normal
+conversational pauses.
+
+All three strategies were tested against the same recorded dataset. The 60-second gap
+approach produced clean, human-meaningful conversation boundaries. The other two produced
+fragmented, overlapping, or meaningless splits.
+
+---
+
 ## Known Issues & Quirks
 
 **Erroneous battery level reports**
@@ -390,10 +427,9 @@ The pendant occasionally enters a state where it records at a severely reduced r
 of normal) despite appearing to be on and connected. The root cause is unknown — it is a
 firmware issue and BLE commands cannot fix it. The symptom is very little new audio appearing
 between syncs even during active conversation. The fix is a physical button press: hold the
-button for two seconds to stop recording, then hold again for two seconds to restart. The sync
-log's `Session Health` line is the early warning signal — a healthy pendant advances 30–60
-sessions per hour during active use; a degraded pendant will show a near-zero rate. If
-`Session ID unchanged for X minutes` appears in the log, press the button.
+button for two seconds to stop recording, then hold again for two seconds to restart. If
+`PENDANT_HEALTH_MONITORING=enabled` is set in `.env`, a persistent macOS alert dialog will
+appear automatically when this condition is detected — you don't need to watch the logs.
 
 ---
 
