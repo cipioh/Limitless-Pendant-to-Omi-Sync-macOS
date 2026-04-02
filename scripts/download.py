@@ -2056,7 +2056,7 @@ async def main(argv: list[str] | None = None) -> int:
                         prev_ts = float(parts[1])
                         elapsed_min = (now_ts - prev_ts) / 60
                         delta = storage_session - prev_session
-                        if elapsed_min >= 10:
+                        if elapsed_min >= 2:
                             rate = delta / (elapsed_min / 60)
                             print(f"Session Health: +{delta} sessions in {elapsed_min:.0f}min ({rate:.0f}/hr)", flush=True)
                             if delta == 0 and elapsed_min >= 30:

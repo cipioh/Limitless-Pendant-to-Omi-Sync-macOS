@@ -384,14 +384,15 @@ The Bluetooth circuit breaker handles this automatically: it power-cycles the ra
 up to 15 times per sync cycle. If it consistently hits the retry limit, check for interference
 or try moving closer to the Mac during sync.
 
-**Degraded recording rate after a long BLE session**
+**Randomly degraded recording rate**
 The pendant occasionally enters a state where it records at a severely reduced rate (~2–3%
-of normal) despite appearing to be on and connected. This is a firmware issue — BLE commands
-cannot fix it. The symptom is very little new audio appearing between syncs even during active
-conversation. The fix is a physical button press: press once to stop recording, press again to
-restart. The sync log's `Session Health` line is the early warning signal — a healthy pendant
-advances 30–60 sessions per hour during active use; a degraded pendant will show a near-zero
-rate. If `Session ID unchanged for X minutes` appears in the log, press the button.
+of normal) despite appearing to be on and connected. The root cause is unknown — it is a
+firmware issue and BLE commands cannot fix it. The symptom is very little new audio appearing
+between syncs even during active conversation. The fix is a physical button press: hold the
+button for two seconds to stop recording, then hold again for two seconds to restart. The sync
+log's `Session Health` line is the early warning signal — a healthy pendant advances 30–60
+sessions per hour during active use; a degraded pendant will show a near-zero rate. If
+`Session ID unchanged for X minutes` appears in the log, press the button.
 
 ---
 
