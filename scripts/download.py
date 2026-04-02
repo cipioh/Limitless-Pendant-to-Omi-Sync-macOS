@@ -2045,8 +2045,9 @@ async def main(argv: list[str] | None = None) -> int:
                 # Session health check: compare with previous sync's session ID.
                 # During healthy recording the session ID advances ~30-60 times per hour
                 # (the pendant creates a new session on every speech pause via VAD).
-                # A very low or zero delta over a long interval means the pendant stopped
-                # or severely throttled its recording — physical button press is the fix.
+                # A zero delta over a long interval means the pendant stopped recording.
+                # Only meaningful for continuous/always-on recording — opt in via .env.
+                health_monitoring = os.getenv("PENDANT_HEALTH_MONITORING", "").lower() in ("1", "true", "enabled", "yes")
                 session_state_file = output_dir / ".session_state"
                 now_ts = time.time()
                 if session_state_file.exists():
@@ -2056,11 +2057,11 @@ async def main(argv: list[str] | None = None) -> int:
                         prev_ts = float(parts[1])
                         elapsed_min = (now_ts - prev_ts) / 60
                         delta = storage_session - prev_session
-                        if elapsed_min >= 2:
-                            rate = delta / (elapsed_min / 60)
-                            print(f"Session Health: +{delta} sessions in {elapsed_min:.0f}min ({rate:.0f}/hr)", flush=True)
+                        if elapsed_min >= 2 and health_monitoring:
                             if delta == 0 and elapsed_min >= 30:
-                                print(f"[!] Session ID unchanged for {elapsed_min:.0f} minutes — pendant may not be recording. Try pressing the button.", flush=True)
+                                print("[!] Pendant Status: Unhealthy - Stop and restart recording using pendant button to reset.", flush=True)
+                            else:
+                                print("Pendant Status: Healthy", flush=True)
                     except Exception:
                         pass
                 try:

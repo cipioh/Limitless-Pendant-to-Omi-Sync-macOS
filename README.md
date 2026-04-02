@@ -117,13 +117,14 @@ before uploading to the Omi API:
 - **Configurable file retention** — control what happens to discarded and synced files via
   `.env` flags (delete immediately, keep for N days, or keep forever), independently for WAV
   and JSON files.
-- **Recording health monitoring** — every sync checks whether the pendant's internal session
-  counter has advanced at a healthy rate since the last sync (~30–60 sessions/hour during
-  active use). If the rate is near zero, the log flags it immediately: `Session Health: +2
-  sessions in 65min (2/hr)` and warns you to press the button. Based on reverse-engineering
-  the pendant's VAD (voice activity detection) protocol — each speech pause creates a new
-  session, making the session rate a reliable proxy for recording health without any
-  proprietary firmware access.
+- **Recording health monitoring** *(opt-in, for continuous recording mode)* — every sync
+  checks whether the pendant's internal session counter has advanced since the last sync.
+  If the counter is stuck for 30+ minutes the log immediately flags it:
+  `[!] Pendant Status: Unhealthy - Stop and restart recording using pendant button to reset.`
+  Based on reverse-engineering the pendant's VAD (voice activity detection) protocol — each
+  speech pause creates a new session, making the session counter a reliable proxy for
+  recording health without any proprietary firmware access. Enable via
+  `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
 - **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
   / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
 
