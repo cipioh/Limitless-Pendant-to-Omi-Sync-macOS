@@ -136,6 +136,19 @@ def notify(title, message):
         capture_output=True  # Suppress osascript output from cluttering the log
     )
 
+def notify_alert(title, message):
+    """
+    Sends a persistent macOS alert dialog via AppleScript (display alert).
+    Unlike display notification, this stays on screen until the user clicks OK —
+    use for critical conditions that require user action (e.g. pendant not recording).
+    Launched with Popen (fire-and-forget) so it doesn't block the sync loop.
+    """
+    subprocess.Popen(
+        ["osascript", "-e", f'display alert "{title}" message "{message}" as warning'],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
 def log(message, separator=False):
     """
     Appends a timestamped message to the log file and prints it to stdout.
@@ -279,6 +292,8 @@ async def sync_cycle():
 
             if "[!]" in decoded_line:
                 log(decoded_line)
+                if "Pendant Status: Unhealthy" in decoded_line:
+                    notify_alert("⚠️ Pendant Not Recording", "Hold button 2s to stop, hold again to restart.")
             elif any(x in decoded_line for x in ["Downloaded", "Found", "Battery", "Oldest", "Newest", "First", "Skipping", "Session", "Health", "File created", "Phantom", "Aborting", "Pendant"]):
                 log(f"     | {decoded_line}")
             elif any(x in decoded_line for x in ["Connected", "Downloading", "Starting"]):

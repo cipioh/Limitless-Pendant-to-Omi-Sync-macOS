@@ -119,11 +119,11 @@ before uploading to the Omi API:
   and JSON files.
 - **Recording health monitoring** *(opt-in, for continuous recording mode)* — every sync
   checks whether the pendant's internal session counter has advanced since the last sync.
-  If the counter is stuck for 30+ minutes the log immediately flags it:
-  `[!] Pendant Status: Unhealthy - Stop and restart recording using pendant button to reset.`
-  Based on reverse-engineering the pendant's VAD (voice activity detection) protocol — each
-  speech pause creates a new session, making the session counter a reliable proxy for
-  recording health without any proprietary firmware access. Enable via
+  If the counter is stuck for 30+ minutes, a **persistent macOS alert dialog** pops up and
+  stays on screen until dismissed — you don't need to watch any logs. Based on
+  reverse-engineering the pendant's VAD (voice activity detection) protocol — each speech
+  pause creates a new session, making the session counter a reliable proxy for recording
+  health without any proprietary firmware access. Enable via
   `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
 - **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
   / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
