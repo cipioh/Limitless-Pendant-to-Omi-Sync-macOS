@@ -2056,10 +2056,11 @@ async def main(argv: list[str] | None = None) -> int:
                         elapsed_min = (now_ts - prev_ts) / 60
                         delta = storage_session - prev_session
                         if elapsed_min >= 2 and health_monitoring:
+                            rate = delta / (elapsed_min / 60)
                             if delta == 0 and elapsed_min >= 30:
                                 print("[!] Pendant Status: Unhealthy - Stop and restart recording using pendant button to reset.", flush=True)
                             else:
-                                print("Pendant Status: Healthy", flush=True)
+                                print(f"Pendant Status: Healthy (+{delta} sessions in {elapsed_min:.0f}min, {rate:.0f}/hr)", flush=True)
                     except Exception:
                         pass
                 try:
