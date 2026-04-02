@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.limitless.omisync</string>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/YOUR_USERNAME/omi</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/YOUR_USERNAME/omi/.venv/bin/python3</string>
+        <string>/Users/YOUR_USERNAME/omi/scripts/pendant_sync.py</string>
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USERNAME/omi/limitless_data/logs/daemon.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USERNAME/omi/limitless_data/logs/daemon_error.log</string>
+</dict>
+</plist>

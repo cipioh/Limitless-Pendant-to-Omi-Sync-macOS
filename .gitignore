@@ -1,0 +1,28 @@
+# Secure Environment Variables
+.env
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Personal Data & Logs (CRITICAL)
+limitless_data/
+*.bin
+*.wav
+*.dote
+*.txt
+*.md
+*.tmp
+*.zip
+
+# Python Cache & System Files
+__pycache__/
+*.pyc
+.DS_Store
+
+# Claude Code internal directory (worktrees, memory, plans)
+.claude/
+
+!README.md
+!requirements.txt
