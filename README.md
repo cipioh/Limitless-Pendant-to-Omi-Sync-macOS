@@ -117,6 +117,13 @@ before uploading to the Omi API:
 - **Configurable file retention** — control what happens to discarded and synced files via
   `.env` flags (delete immediately, keep for N days, or keep forever), independently for WAV
   and JSON files.
+- **Recording health monitoring** — every sync checks whether the pendant's internal session
+  counter has advanced at a healthy rate since the last sync (~30–60 sessions/hour during
+  active use). If the rate is near zero, the log flags it immediately: `Session Health: +2
+  sessions in 65min (2/hr)` and warns you to press the button. Based on reverse-engineering
+  the pendant's VAD (voice activity detection) protocol — each speech pause creates a new
+  session, making the session rate a reliable proxy for recording health without any
+  proprietary firmware access.
 - **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
   / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
 
@@ -376,6 +383,15 @@ The pendant's BLE stack occasionally stops sending data mid-download without dis
 The Bluetooth circuit breaker handles this automatically: it power-cycles the radio and retries
 up to 15 times per sync cycle. If it consistently hits the retry limit, check for interference
 or try moving closer to the Mac during sync.
+
+**Degraded recording rate after a long BLE session**
+The pendant occasionally enters a state where it records at a severely reduced rate (~2–3%
+of normal) despite appearing to be on and connected. This is a firmware issue — BLE commands
+cannot fix it. The symptom is very little new audio appearing between syncs even during active
+conversation. The fix is a physical button press: press once to stop recording, press again to
+restart. The sync log's `Session Health` line is the early warning signal — a healthy pendant
+advances 30–60 sessions per hour during active use; a degraded pendant will show a near-zero
+rate. If `Session ID unchanged for X minutes` appears in the log, press the button.
 
 ---
 

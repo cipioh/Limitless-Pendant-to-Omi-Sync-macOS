@@ -279,7 +279,7 @@ async def sync_cycle():
 
             if "[!]" in decoded_line:
                 log(decoded_line)
-            elif any(x in decoded_line for x in ["Downloaded", "Found", "Battery", "Oldest", "Newest", "First", "Skipping", "Session", "File created", "Phantom", "Aborting", "Pendant"]):
+            elif any(x in decoded_line for x in ["Downloaded", "Found", "Battery", "Oldest", "Newest", "First", "Skipping", "Session", "Health", "File created", "Phantom", "Aborting", "Pendant"]):
                 log(f"     | {decoded_line}")
             elif any(x in decoded_line for x in ["Connected", "Downloading", "Starting"]):
                 log(decoded_line)

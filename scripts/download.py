@@ -2042,6 +2042,32 @@ async def main(argv: list[str] | None = None) -> int:
             if storage_session is not None:
                 print(f"Session ID: {storage_session}", flush=True)
 
+                # Session health check: compare with previous sync's session ID.
+                # During healthy recording the session ID advances ~30-60 times per hour
+                # (the pendant creates a new session on every speech pause via VAD).
+                # A very low or zero delta over a long interval means the pendant stopped
+                # or severely throttled its recording — physical button press is the fix.
+                session_state_file = output_dir / ".session_state"
+                now_ts = time.time()
+                if session_state_file.exists():
+                    try:
+                        parts = session_state_file.read_text().strip().split(",")
+                        prev_session = int(parts[0])
+                        prev_ts = float(parts[1])
+                        elapsed_min = (now_ts - prev_ts) / 60
+                        delta = storage_session - prev_session
+                        if elapsed_min >= 10:
+                            rate = delta / (elapsed_min / 60)
+                            print(f"Session Health: +{delta} sessions in {elapsed_min:.0f}min ({rate:.0f}/hr)", flush=True)
+                            if delta == 0 and elapsed_min >= 30:
+                                print(f"[!] Session ID unchanged for {elapsed_min:.0f} minutes — pendant may not be recording. Try pressing the button.", flush=True)
+                    except Exception:
+                        pass
+                try:
+                    session_state_file.write_text(f"{storage_session},{now_ts}")
+                except Exception:
+                    pass
+
             # Stop the download before it starts if under 50 pages.
             # Small backlogs are left to accumulate on the pendant to avoid creating
             # many tiny audio files. 50 pages ≈ 70 seconds of audio.
