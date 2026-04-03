@@ -147,13 +147,15 @@ def transcribe_directory(wav_dir: Path) -> int:
         print(f"[!] Failed to load diarization model ({e}). Transcription will proceed without speaker labels.", flush=True)
 
     any_failed = False
+    total = len(pending)
 
-    for wav_path in pending:
+    for i, wav_path in enumerate(pending, 1):
         json_path = wav_dir / (wav_path.stem + ".json")
-        print(f"Transcribing: {wav_path.name}", flush=True)
+        print(f"[{i}/{total}] Transcribing: {wav_path.name}", flush=True)
 
         try:
             # --- Pass 1: Transcription ---
+            print(f"  [1/3] Transcribing audio...", flush=True)
             audio = whisperx.load_audio(str(wav_path))
             result = model.transcribe(audio, language="en", batch_size=16)
             detected_language = result.get("language", "en")
@@ -161,6 +163,7 @@ def transcribe_directory(wav_dir: Path) -> int:
             # --- Pass 2: Word-level alignment ---
             # Aligns each word to a precise timestamp so speaker boundaries can be
             # assigned at the word level rather than at the coarser segment level.
+            print(f"  [2/3] Aligning words...", flush=True)
             try:
                 align_model, align_metadata = whisperx.load_align_model(
                     language_code=detected_language,
@@ -178,6 +181,7 @@ def transcribe_directory(wav_dir: Path) -> int:
                 print(f"  [!] Alignment failed ({e}). Speaker boundaries may be less accurate.", flush=True)
 
             # --- Pass 3: Diarization ---
+            print(f"  [3/3] Diarizing speakers...", flush=True)
             if diarize_pipeline is not None and result.get("segments"):
                 try:
                     diarize_segments = diarize_pipeline(audio)
