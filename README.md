@@ -420,7 +420,8 @@ know what's happening without needing to watch the log.
 │   ├── download.py         Phase 1: BLE download from pendant
 │   ├── convert.py          Phase 2: Opus .bin → 16kHz WAV
 │   ├── transcribe.py       Phase 3 (faster-whisper): WAV → JSON transcript
-│   └── send_to_omi.py      Phase 4: quality filter + Omi API upload
+│   ├── send_to_omi.py      Phase 4: quality filter + Omi API upload
+│   └── set_brightness.py   Independent script to set LED brightness
 ├── limitless_data/
 │   ├── downloads/
 │   │   ├── *.bin           Raw Opus audio from the pendant
