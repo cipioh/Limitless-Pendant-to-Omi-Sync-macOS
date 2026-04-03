@@ -128,6 +128,9 @@ before uploading to the Omi API:
   `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
 - **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
   / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
+- **LED brightness control** — a separate `set_brightness.py` utility lets you adjust the
+  pendant's LED brightness (0–100) from the command line without touching the main sync
+  workflow. See [Setting LED Brightness](#setting-led-brightness).
 
 ---
 
@@ -578,6 +581,48 @@ Run: `./.venv/bin/pip install faster-whisper`
 This is expected. The script downloads, converts, and transcribes in 2,000-page chunks (~47
 minutes of audio per chunk). For a very large backlog, let it run overnight. You can monitor
 progress with `tail -f limitless_data/logs/automation.log`.
+
+---
+
+## Setting LED Brightness
+
+The pendant's LED brightness can be adjusted using `set_brightness.py` — a standalone
+utility that is separate from the main sync pipeline. Connect it occasionally when you want
+to dim or brighten the LED; it has no effect on sync behaviour.
+
+If `PENDANT_MAC_ADDRESS` is already set in your `.env` file (populated automatically after
+the first successful sync), the script connects directly without scanning — a few seconds
+instead of the usual 8-second BLE discovery scan.
+
+**Usage:**
+
+```bash
+# Use address from .env automatically, or fall back to a scan
+python scripts/set_brightness.py 75
+
+# Connect to a specific device by address
+python scripts/set_brightness.py --address AA:BB:CC:DD:EE:FF 50
+
+# Match device by advertised name instead
+python scripts/set_brightness.py --name Pendant 0
+
+# See all options
+python scripts/set_brightness.py --help
+```
+
+**Brightness levels:**
+
+| Value | Effect |
+|-------|--------|
+| `0`   | Off (or minimum glow — exact behaviour is pendant-firmware dependent) |
+| `50`  | Half brightness |
+| `100` | Full brightness |
+
+Values outside 0–100 are clamped automatically with a printed warning.
+
+> **Note:** Brightness is write-only. The pendant's firmware does not expose a readable
+> BLE characteristic for the current brightness level, so there is no way to query what
+> it is currently set to. The script prints the value it sent, not a confirmed readback.
 
 ---
 
