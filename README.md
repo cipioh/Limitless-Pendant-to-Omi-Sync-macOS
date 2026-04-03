@@ -346,7 +346,8 @@ processes them on a future cycle.
 > **Stall alert:** If a cycle ends without generating any transcripts, the following sync
 > cycle will fire a persistent macOS alert prompting you to check that MacWhisper is running.
 > If you prefer a zero-maintenance setup that doesn't require keeping an app running, switch
-> to `TRANSCRIPTION_ENGINE=faster-whisper` (see below). Trade-off: no speaker diarization.
+> to `TRANSCRIPTION_ENGINE=faster-whisper` (no speaker diarization) or `TRANSCRIPTION_ENGINE=
+> whisperx`(has speaker diariazation).
 
 ---
 
