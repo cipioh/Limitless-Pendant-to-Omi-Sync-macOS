@@ -95,6 +95,42 @@ before uploading to the Omi API:
 
 ---
 
+## Key Features
+
+- **Set-and-forget background service** — runs every hour via macOS `launchctl`.
+- **"Welcome Back" auto-sync** — detects when you return to your Mac after being away for a
+  while (missing a scheduled sync) and triggers an immediate catch-up sync, without waiting
+  for the next scheduled hour.
+- **Conversation-aware segmentation** — audio is automatically split into individual files at
+  natural silence gaps (60+ seconds between timestamps). Each distinct conversation becomes
+  its own file, transcript, and Omi timeline entry rather than one long undifferentiated
+  audio blob. See [Conversation Segmentation](#conversation-segmentation) for why this
+  approach was chosen over the pendant's own session and start/stop markers.
+- **Drain-and-convert chunking** — safely processes large backlogs in stable 2,000-page chunks,
+  converting each before pulling the next. Prevents Bluetooth timeouts on large downloads.
+- **Natural gap chunking** — when a chunk is large, the script looks for a natural 60-second
+  recording gap in the 1,500–2,000 page zone as a clean audio boundary, rather than always
+  cutting at the hard 2,000-page limit.
+- **Bluetooth circuit breaker** — if the radio stalls mid-download, the script power-cycles
+  the Bluetooth chip using `blueutil` and retries, up to 15 times per cycle.
+- **Streaming crash recovery** — audio is written to a `.part` file continuously. A crash or
+  disconnect never loses more than the most recent unacknowledged page.
+- **Configurable file retention** — control what happens to discarded and synced files via
+  `.env` flags (delete immediately, keep for N days, or keep forever), independently for WAV
+  and JSON files.
+- **Recording health monitoring** *(opt-in, for continuous recording mode)* — every sync
+  checks whether the pendant's internal session counter has advanced since the last sync.
+  If the counter is stuck for 30+ minutes, a **persistent macOS alert dialog** pops up and
+  stays on screen until dismissed — you don't need to watch any logs. Based on
+  reverse-engineering the pendant's VAD (voice activity detection) protocol — each speech
+  pause creates a new session, making the session counter a reliable proxy for recording
+  health without any proprietary firmware access. Enable via
+  `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
+- **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
+  / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
+
+---
+
 ## Sample Log Walkthrough
 
 The log below is from a real sync session after returning home from band rehearsal. It covers
@@ -201,42 +237,6 @@ nearly every state the system can reach in a single run. Annotations explain wha
 [08:36:31PM] Cycle complete.
 [08:36:31PM] Sleeping. Next scheduled check at 09:36 PM
 ```
-
----
-
-## Key Features
-
-- **Set-and-forget background service** — runs every hour via macOS `launchctl`.
-- **"Welcome Back" auto-sync** — detects when you return to your Mac after being away for a
-  while (missing a scheduled sync) and triggers an immediate catch-up sync, without waiting
-  for the next scheduled hour.
-- **Conversation-aware segmentation** — audio is automatically split into individual files at
-  natural silence gaps (60+ seconds between timestamps). Each distinct conversation becomes
-  its own file, transcript, and Omi timeline entry rather than one long undifferentiated
-  audio blob. See [Conversation Segmentation](#conversation-segmentation) for why this
-  approach was chosen over the pendant's own session and start/stop markers.
-- **Drain-and-convert chunking** — safely processes large backlogs in stable 2,000-page chunks,
-  converting each before pulling the next. Prevents Bluetooth timeouts on large downloads.
-- **Natural gap chunking** — when a chunk is large, the script looks for a natural 60-second
-  recording gap in the 1,500–2,000 page zone as a clean audio boundary, rather than always
-  cutting at the hard 2,000-page limit.
-- **Bluetooth circuit breaker** — if the radio stalls mid-download, the script power-cycles
-  the Bluetooth chip using `blueutil` and retries, up to 15 times per cycle.
-- **Streaming crash recovery** — audio is written to a `.part` file continuously. A crash or
-  disconnect never loses more than the most recent unacknowledged page.
-- **Configurable file retention** — control what happens to discarded and synced files via
-  `.env` flags (delete immediately, keep for N days, or keep forever), independently for WAV
-  and JSON files.
-- **Recording health monitoring** *(opt-in, for continuous recording mode)* — every sync
-  checks whether the pendant's internal session counter has advanced since the last sync.
-  If the counter is stuck for 30+ minutes, a **persistent macOS alert dialog** pops up and
-  stays on screen until dismissed — you don't need to watch any logs. Based on
-  reverse-engineering the pendant's VAD (voice activity detection) protocol — each speech
-  pause creates a new session, making the session counter a reliable proxy for recording
-  health without any proprietary firmware access. Enable via
-  `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
-- **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
-  / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
 
 ---
 
