@@ -4,8 +4,9 @@ A background Mac service that connects directly to your Limitless Pendant over B
 downloads stored audio, transcribes it locally, filters out AI hallucinations, and uploads
 clean conversations to your Omi timeline — automatically, every hour.
 
-Supports **MacWhisper** (GUI, with speaker diarization) and **faster-whisper** (CLI,
-fully automated, no GUI dependency) as transcription engines.
+Supports **MacWhisper** (GUI, speaker diarization), **faster-whisper** (CLI, fully
+automated, no GUI dependency), and **WhisperX** (CLI, fully automated, with speaker
+diarization) as transcription engines.
 
 ---
 
@@ -80,6 +81,9 @@ only the last few seconds of audio rather than the entire session.
   files have matching transcripts, or until the 30-minute timeout.
 - **`faster-whisper`** — `transcribe.py` runs as a subprocess immediately after conversion.
   No GUI, no watch folder, fully automated.
+- **`whisperx`** — `transcribe_whisperx.py` runs as a subprocess immediately after conversion.
+  Like faster-whisper but adds speaker diarization: each segment is labeled with who was
+  speaking (`SPEAKER_00`, `SPEAKER_01`, etc.).
 
 **Phase 4 — Filter & Upload:** `send_to_omi.py` runs each transcript through a quality filter
 before uploading to the Omi API:
@@ -295,10 +299,33 @@ See [Transcription Engines](#transcription-engines) below and set `TRANSCRIPTION
 
 ## Transcription Engines
 
+### Comparison
+
+| | MacWhisper | faster-whisper | WhisperX |
+|---|---|---|---|
+| Speaker diarization | Yes | No | Yes |
+| Fully automated (no GUI) | No | Yes | Yes |
+| Runs locally / offline | Yes | Yes | Yes* |
+| GPU required | No | No | No (but faster with one) |
+| Extra accounts needed | None | None | Free HuggingFace account |
+| Setup complexity | Medium (GUI config) | Low (one pip install) | Medium (pip + HF token) |
+| Transcription speed | Fast | Fast | Slower (3 passes) |
+| Accuracy | High | High | High |
+
+\* Model weights download once on first run, then run fully offline.
+
+> **Speaker identification note:** All three engines label speakers by voice clustering —
+> they group voices together but cannot identify *who* each speaker is. Check your transcript
+> output to find which label consistently appears for your own voice, then set
+> `USER_SPEAKER_LABEL` in `.env` to that label so Omi marks your segments as `is_user: true`
+> and others as `is_user: false`. If left blank, all segments are marked as `is_user: true`.
+
+---
+
 ### MacWhisper (default — `TRANSCRIPTION_ENGINE=macwhisper`)
 
 [MacWhisper](https://goodsnooze.gumroad.com/l/macwhisper) is a macOS app that runs Whisper
-models locally. It supports speaker diarization, meaning it labels each speaker separately
+models locally. It supports speaker diarization and labels each speaker separately
 (e.g., "Speaker 1", "Speaker 2") — useful for multi-person conversations.
 
 **Setup:**
@@ -312,14 +339,6 @@ models locally. It supports speaker diarization, meaning it labels each speaker 
 MacWhisper must be **running** (not necessarily in the foreground) for the watch folder to
 work. The sync service will wait up to 30 minutes for transcripts to appear.
 
-> **Speaker identification note:** MacWhisper labels speakers as "Speaker 1", "Speaker 2",
-> etc. based on voice clustering — it groups voices together but does not identify *who* they
-> belong to. There is currently no offline tool that can automatically identify which speaker
-> is you without a separate voice enrollment step. If you consistently appear as the same
-> speaker label, you can configure `USER_SPEAKER_LABEL=Speaker 1` (or whichever label is you)
-> in `.env` so that Omi correctly marks your segments as `is_user: true` and others as
-> `is_user: false`. If left blank, all segments are marked as `is_user: true` (the default).
-
 ---
 
 ### faster-whisper (`TRANSCRIPTION_ENGINE=faster-whisper`)
@@ -328,8 +347,9 @@ work. The sync service will wait up to 30 minutes for transcripts to appear.
 Whisper models locally with no GUI. The pipeline calls `transcribe.py` directly after
 conversion — no watch folder, no polling, fully automated end-to-end.
 
-**Note:** faster-whisper does not include speaker diarization. All segments will be attributed
-to a single speaker (`SPEAKER_00`). If you need speaker separation, use MacWhisper instead.
+**Note:** faster-whisper does not include speaker diarization. All segments are attributed
+to a single speaker (`SPEAKER_00`). If you need speaker separation, use MacWhisper or
+WhisperX instead.
 
 **Setup:**
 ```bash
@@ -348,6 +368,54 @@ accuracy at the cost of speed.
 
 ---
 
+### WhisperX (`TRANSCRIPTION_ENGINE=whisperx`)
+
+[WhisperX](https://github.com/m-bain/whisperX) is a Python library built on faster-whisper
+that adds speaker diarization and word-level alignment. The pipeline calls
+`transcribe_whisperx.py` directly after conversion — no GUI, no watch folder, fully
+automated end-to-end.
+
+WhisperX runs three passes over each audio file:
+1. **Transcription** — faster-whisper (same models, same accuracy)
+2. **Alignment** — pins each word to a precise timestamp so speaker changes mid-sentence
+   are handled correctly
+3. **Diarization** — [pyannote.audio](https://github.com/pyannote/pyannote-audio) identifies
+   who is speaking when, and labels each segment `SPEAKER_00`, `SPEAKER_01`, etc.
+
+The extra passes make it slower than bare faster-whisper, but the tradeoff is structured,
+speaker-attributed output rather than one undifferentiated block of text.
+
+**Setup:**
+
+```bash
+./.venv/bin/pip install whisperx
+```
+
+The diarization models require a free HuggingFace account and a one-time license
+acceptance:
+
+1. Create a free account at [huggingface.co](https://huggingface.co)
+2. Accept the license for each pyannote model (click **Agree and access repository**):
+   - [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+   - [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
+3. Generate a read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+4. Add it to `.env`:
+
+```env
+TRANSCRIPTION_ENGINE=whisperx
+WHISPER_MODEL=base         # tiny | base | small | medium | large-v2 | large-v3
+WHISPERX_HF_TOKEN=hf_your_token_here
+```
+
+Model weights download once on first run (whisper model + pyannote diarization models,
+~1 GB total for `base`). All subsequent runs are fully offline.
+
+After transcription, set `USER_SPEAKER_LABEL` in `.env` to whichever speaker label is
+consistently you (check a transcript to find out — it will be `SPEAKER_00` or `SPEAKER_01`,
+etc.) so Omi correctly attributes your segments.
+
+---
+
 ## Configuration Reference
 
 All settings live in `.env` at the project root. Copy `.env.example` as your starting point.
@@ -357,10 +425,11 @@ All settings live in `.env` at the project root. Copy `.env.example` as your sta
 | `OMI_API_KEY` | *(required)* | Your Omi Developer API key |
 | `PENDANT_MAC_ADDRESS` | *(auto-detected)* | BLE address of your pendant. Leave blank on first run. |
 | `LIMITLESS_BASE_DIR` | *(project root)* | Override data storage location (e.g., an external drive) |
-| `TRANSCRIPTION_ENGINE` | `macwhisper` | `macwhisper` or `faster-whisper` |
-| `WHISPER_MODEL` | `base` | faster-whisper model size: `tiny` / `base` / `small` / `medium` / `large-v2` / `large-v3` |
-| `WHISPER_DEVICE` | `cpu` | faster-whisper device: `cpu` or `cuda` |
-| `WHISPER_COMPUTE` | `int8` | faster-whisper compute type: `int8` / `float16` / `float32` |
+| `TRANSCRIPTION_ENGINE` | `macwhisper` | `macwhisper`, `faster-whisper`, or `whisperx` |
+| `WHISPER_MODEL` | `base` | Model size (faster-whisper / whisperx): `tiny` / `base` / `small` / `medium` / `large-v2` / `large-v3` |
+| `WHISPER_DEVICE` | `cpu` | Device (faster-whisper / whisperx): `cpu` or `cuda` |
+| `WHISPER_COMPUTE` | `int8` | Compute type (faster-whisper / whisperx): `int8` / `float16` / `float32` |
+| `WHISPERX_HF_TOKEN` | *(empty)* | HuggingFace token for WhisperX diarization models. Required when `TRANSCRIPTION_ENGINE=whisperx`. |
 | `USER_SPEAKER_LABEL` | *(empty)* | Speaker label to mark as `is_user: true` (e.g. `Speaker 1`). Leave blank to mark all speakers as user. |
 | `DISCARD_ACTION` | `keep` | What to do with rejected transcripts: `keep` (move to `discarded_audio/`) or `delete` |
 | `DISCARD_RETENTION_DAYS` | `7` | Days before `discarded_audio/` files are auto-deleted. `0` = keep forever. |
@@ -421,6 +490,7 @@ know what's happening without needing to watch the log.
 │   ├── download.py         Phase 1: BLE download from pendant
 │   ├── convert.py          Phase 2: Opus .bin → 16kHz WAV
 │   ├── transcribe.py       Phase 3 (faster-whisper): WAV → JSON transcript
+│   ├── transcribe_whisperx.py  Phase 3 (whisperx): WAV → JSON transcript with speaker labels
 │   ├── send_to_omi.py      Phase 4: quality filter + Omi API upload
 │   └── set_brightness.py   Independent script to set LED brightness
 ├── limitless_data/
@@ -578,6 +648,20 @@ and are found in the Omi app under **Settings → Developer**.
 
 **"No module named faster_whisper"**
 Run: `./.venv/bin/pip install faster-whisper`
+
+**"No module named whisperx"**
+Run: `./.venv/bin/pip install whisperx`
+
+**WhisperX diarization fails with "WHISPERX_HF_TOKEN is not set"**
+Follow the WhisperX setup steps in [Transcription Engines](#transcription-engines): create a
+HuggingFace account, accept the pyannote model licenses, generate a token, and add
+`WHISPERX_HF_TOKEN=<token>` to `.env`.
+
+**WhisperX diarization fails with a 401 or access error**
+The HuggingFace token is present but the pyannote model licenses haven't been accepted yet.
+Visit both model pages and click **Agree and access repository**:
+- https://huggingface.co/pyannote/speaker-diarization-3.1
+- https://huggingface.co/pyannote/segmentation-3.0
 
 **Large backlog taking a very long time**
 This is expected. The script downloads, converts, and transcribes in 2,000-page chunks (~47
