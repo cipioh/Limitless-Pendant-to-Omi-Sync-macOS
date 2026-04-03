@@ -256,7 +256,7 @@ nearly every state the system can reach in a single run. Annotations explain wha
 | Python 3.11+ | `python3 --version` to check |
 | [blueutil](https://github.com/toy/blueutil) | Bluetooth circuit breaker: `brew install blueutil` |
 | Omi Developer API Key | From **Settings → Developer** in the Omi app |
-| **Either** MacWhisper **or** faster-whisper | See [Transcription Engines](#transcription-engines) |
+| **Either** MacWhisper **or** faster-whisper/WhisperX | MacWhisper requires a paid Pro license for watch-folder automation. faster-whisper and WhisperX are free. See [Transcription Engines](#transcription-engines) |
 
 ---
 
@@ -307,6 +307,7 @@ See [Transcription Engines](#transcription-engines) below and set `TRANSCRIPTION
 | Fully automated (no GUI) | No | Yes | Yes |
 | Runs locally / offline | Yes | Yes | Yes* |
 | GPU required | No | No | No (but faster with one) |
+| Cost | Paid (Pro license) | Free | Free |
 | Extra accounts needed | None | None | Free HuggingFace account |
 | Setup complexity | Medium (GUI config) | Low (one pip install) | Medium (pip + HF token) |
 | Transcription speed | Fast | Fast | Slower (3 passes) |
@@ -328,6 +329,9 @@ See [Transcription Engines](#transcription-engines) below and set `TRANSCRIPTION
 [MacWhisper](https://goodsnooze.gumroad.com/l/macwhisper) is a macOS app that runs Whisper
 models locally. It supports speaker diarization and labels each speaker separately
 (e.g., "Speaker 1", "Speaker 2") — useful for multi-person conversations.
+
+> **Note:** Watch-folder automation (required for this pipeline) is a **Pro** feature.
+> MacWhisper Pro is a one-time purchase from the link above.
 
 **Setup:**
 1. Install MacWhisper and open it.
