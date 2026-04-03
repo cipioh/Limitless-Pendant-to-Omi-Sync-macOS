@@ -428,7 +428,7 @@ acceptance:
 2. Accept the license for each pyannote model (click **Agree and access repository**):
    - [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
    - [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
-3. Generate a read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+3. Generate a "READ" token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
 4. Add it to `.env`:
 
 ```env
