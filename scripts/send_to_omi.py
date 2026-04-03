@@ -480,7 +480,14 @@ def upload_transcripts(input_dir: str, api_key: str):
         except Exception as e:
             print(f"  [!] Could not parse timestamp for {transcript_file.name}: {e} — uploading without started_at", flush=True)
 
-        response = requests.post("https://api.omi.me/v1/dev/user/conversations/from-segments", headers=headers, json=payload)
+        try:
+            response = requests.post("https://api.omi.me/v1/dev/user/conversations/from-segments", headers=headers, json=payload)
+        except requests.exceptions.ConnectTimeout:
+            print(f"  [!] Network timeout uploading {transcript_file.name} — no network access? Will retry next cycle.", flush=True)
+            continue
+        except requests.exceptions.ConnectionError:
+            print(f"  [!] Network error uploading {transcript_file.name} — no network access? Will retry next cycle.", flush=True)
+            continue
 
         if response.status_code in (200, 201):
             # --- CHECK FOR APPLICATION-LEVEL ERRORS IN THE RESPONSE BODY ---
