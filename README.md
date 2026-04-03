@@ -614,8 +614,8 @@ python scripts/set_brightness.py --help
 
 | Value | Effect |
 |-------|--------|
-| `0`   | Off (or minimum glow — exact behaviour is pendant-firmware dependent) |
-| `50`  | Half brightness |
+| `0`   | Off |
+| `1-99`  |Variable range of brightness |
 | `100` | Full brightness |
 
 Values outside 0–100 are clamped automatically with a printed warning.
