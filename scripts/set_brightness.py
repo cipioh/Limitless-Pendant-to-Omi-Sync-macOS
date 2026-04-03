@@ -25,7 +25,6 @@ NOTE — BRIGHTNESS CANNOT BE READ BACK:
 USAGE:
     python set_brightness.py 75
     python set_brightness.py --address AA:BB:CC:DD:EE:FF 50
-    python set_brightness.py --name "Pendant" 0
 
 .ENV AUTO-CONNECT:
     If PENDANT_MAC_ADDRESS is set in the project-root .env file (written by

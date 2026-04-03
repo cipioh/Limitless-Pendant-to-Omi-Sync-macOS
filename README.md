@@ -603,9 +603,6 @@ python scripts/set_brightness.py 75
 # Connect to a specific device by address
 python scripts/set_brightness.py --address AA:BB:CC:DD:EE:FF 50
 
-# Match device by advertised name instead
-python scripts/set_brightness.py --name Pendant 0
-
 # See all options
 python scripts/set_brightness.py --help
 ```
