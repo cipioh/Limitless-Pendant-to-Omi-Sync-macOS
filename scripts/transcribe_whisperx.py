@@ -60,6 +60,10 @@ import argparse
 import json
 import os
 import sys
+
+# Ensure Homebrew's bin is on the PATH so ffmpeg (required by whisperx) is
+# found even when the script is launched by launchd, which inherits a minimal PATH.
+os.environ["PATH"] = "/opt/homebrew/bin:" + os.environ.get("PATH", "")
 from pathlib import Path
 from dotenv import load_dotenv
 
