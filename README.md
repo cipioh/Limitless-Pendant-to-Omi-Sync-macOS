@@ -15,7 +15,8 @@ When Limitless sold to Meta, Pendant users were left without a path forward — 
 no transition plan, and no source code released for the hardware we already owned. The open
 source Omi team stepped in, reverse-engineered the pendant's BLE protocol without any help
 from Limitless, and gave the community a way to keep using the devices we had invested in.
-That effort deserves real credit.
+That effort deserves real credit. None of this would be possible with the hard work and rapid
+response from the team at https://www.omi.me
 
 With that said, the Omi integration with the Limitless Pendant is still maturing. Through no
 fault of the Omi team — who are working blind without firmware source code or official
