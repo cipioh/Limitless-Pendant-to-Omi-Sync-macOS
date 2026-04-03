@@ -95,6 +95,115 @@ before uploading to the Omi API:
 
 ---
 
+## Sample Log Walkthrough
+
+The log below is from a real sync session after returning home from band rehearsal. It covers
+nearly every state the system can reach in a single run. Annotations explain what each line means.
+
+```
+# ── MISSED CYCLE ─────────────────────────────────────────────────────────────
+# Pendant was out of range (still at rehearsal) when the hourly sync fired.
+
+[08:13:30PM] Starting Sync Cycle...
+[08:13:30PM] Attempting connection to Pendant...
+[08:13:46PM]      | Pendant not found (out of range or off). Aborting...  ← BLE scan timed out — pendant not found
+[08:13:46PM] Cycle complete.
+[08:13:46PM] Will check again in 1 hour, or sooner if you return...       ← idle-detection now armed
+
+
+# ── WELCOME BACK (early sync) ────────────────────────────────────────────────
+# Mouse/keyboard activity detected ~4 minutes later — immediate catch-up sync triggered.
+
+[08:17:47PM] Activity detected after being away. Triggering early sync...  ← no waiting for the next scheduled hour
+
+
+# ── PENDANT STATUS ───────────────────────────────────────────────────────────
+# Connected successfully. Pendant reports its state before any download begins.
+
+[08:17:52PM]      | Battery Level: 32%                                           ← firmware quirk: it will either be correct, or falsely read 100% randomly
+[08:17:53PM]      | Oldest Flash Page: 90787                                     ← earliest page still stored in pendant flash
+[08:17:53PM]      | Newest Flash Page: 97574                                     ← most recently recorded page (6787 pages ≈ 2.6 hrs)
+[08:17:53PM]      | Pendant Status: Healthy (+138 sessions in 187min, 44/hr)     ← health check: session counter advanced normally over 3+ hour period
+[08:17:53PM]      | Pendant reported 6788 unread flash pages (02:38:23 of audio) ← total queued for this sync
+
+
+# ── CHUNK 1 OF 5: DOWNLOAD ───────────────────────────────────────────────────
+# Large backlog — processed in 2000-page chunks to avoid BLE timeouts.
+# Each "File created" line is one conversation, split at 60-second silence gaps.
+
+[08:17:54PM]      | First Page Sent: 90787                         ← pendant's streaming cursor; authoritative start of this chunk
+[08:17:54PM]      | File created from pages 90787 - 90798 (00:11)  ← short clip — likely noise burst at rehearsal start
+[08:18:01PM]      | File created from pages 90799 - 90862 (01:31)  ↑
+[08:18:23PM]      | File created from pages 90863 - 91081 (05:18)  │ multiple conversations split by 60-second gaps
+[08:18:41PM]      | File created from pages 91082 - 91245 (04:00)  │
+[08:21:20PM]      | File created from pages 92186 - 92787 (15:17)  ← longest segment in this chunk
+[08:21:22PM]      | Downloaded 2001 of 6788 pages - 9.58 p/s - 12 files.  ← chunk limit hit; 4787 pages remain
+
+
+# ── MID-CYCLE: REST + CONVERT ────────────────────────────────────────────────
+# Pendant gets a 30s rest. While it rests, this chunk is converted to WAV.
+# Trying to pull much more data at once almost always results in bluetooth errors.
+# Conversion runs in parallel with the rest — no time wasted.
+
+[08:21:22PM] More data exists. Giving pendant a short rest... (30s)
+[08:21:22PM] Starting WAV Conversion (mid-cycle chunk)...
+[08:21:22PM]      | Found 12 .bin files. Converting to .wav...
+[08:21:31PM]      | Done! Successfully converted 12 files.
+[08:21:31PM]      | Cleaned up 12 raw .bin files.
+
+
+# ── CHUNK 3 OF 5: ACK CURSOR REGRESSION ──────────────────────────────────────
+# The pendant's streaming cursor regressed slightly from last chunk's ACK point.
+# Pages already downloaded are silently skipped — no data is lost or duplicated.
+
+[08:26:31PM]      | Battery Level: 100%                             ← erroneous reading — known firmware quirk
+[08:26:31PM]      | Oldest Flash Page: 92788                        ← pendant has already recycled earlier flash sectors
+[08:26:34PM]      | First Page Sent: 93492                          ← cursor started behind last ACK point...
+[08:26:34PM]      | Skipping pages already ACKed (up to 94787)...   ← ...so already-downloaded pages are skipped automatically
+[08:29:26PM]      | File created from pages 94788 - 95491 (18:06)   ← download picks up cleanly from the right place
+
+
+# ── FINAL CHUNK: COMPLETE DRAIN ──────────────────────────────────────────────
+# Last chunk — fewer pages than the 2000-page limit, so no rest needed after.
+# Lots of short files = band rehearsal winding down (intermittent sound, not conversation).
+
+[08:33:42PM]      | Pendant Status: Healthy (+1 sessions in 4min, 17/hr)  ← end of rehearsal: room going quiet, sparse sound, few VAD events
+[08:33:42PM]      | Pendant reported 280 unread flash pages (06:32)
+[08:33:52PM]      | File created from pages 97492 - 97588 (02:18)   ↑
+[08:33:54PM]      | File created from pages 97589 - 97606 (00:19)   │ short bursts of sound separated by 60-second gaps
+[08:33:57PM]      | File created from pages 97640 - 97646 (00:03)   │ (packing up, walking out)
+[08:34:13PM]      | File created from pages 97672 - 97771 (02:26)   ↓
+[08:34:15PM]      | Downloaded 280 of 280 pages - 8.61 p/s - 10 files.
+[08:34:15PM] Download complete. Moving to conversion.
+
+
+# ── TRANSCRIPTION ─────────────────────────────────────────────────────────────
+# MacWhisper had already processed mid-cycle chunks in the background.
+# Only the final chunk's files are new — 10 files + 15 already done = 25 total.
+
+[08:34:16PM] Waiting for 25 transcripts... (15/25)  ← MacWhisper already finished 15 during download
+[08:34:46PM] All 25 transcripts are ready.          ← last 10 completed
+
+
+# ── OMI UPLOAD: QUALITY FILTER ────────────────────────────────────────────────
+# Every transcript goes through filtering before upload.
+# (all 25 not shown — a sample of each filter type)
+
+[08:34:46PM]      | Skipped: 05.11PM to 05.11PM.dote is empty.                     ← nothing transcribed (silence / pure noise)
+[08:34:49PM]      | Skipped: 05.15PM to 05.20PM.dote contains only hallucinations. ← Whisper ghost phrases on ambient sound
+[08:35:02PM]      | Skipped: 05.56PM to 05.57PM.dote contains only one word.       ← single-word transcript, almost certainly a false positive
+[08:34:49PM]      | Uploading 05.12PM to 05.14PM.dote (1 compressed segments)...   ← passed all filters; uploading
+[08:34:49PM]      | Success: Uploaded and archived as 05.12PM to 05.14PM.json.     ← payload archived locally for reference
+
+
+# ── CYCLE COMPLETE ────────────────────────────────────────────────────────────
+
+[08:36:31PM] Cycle complete.
+[08:36:31PM] Sleeping. Next scheduled check at 09:36 PM
+```
+
+---
+
 ## Key Features
 
 - **Set-and-forget background service** — runs every hour via macOS `launchctl`.
