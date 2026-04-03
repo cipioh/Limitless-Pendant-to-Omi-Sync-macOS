@@ -390,7 +390,18 @@ WhisperX runs three passes over each audio file:
 The extra passes make it slower than bare faster-whisper, but the tradeoff is structured,
 speaker-attributed output rather than one undifferentiated block of text.
 
-**Setup:**
+**Python version note:** The published WhisperX package on PyPI requires Python 3.9–3.13.
+If your venv is running Python 3.14+, install from GitHub instead (the source is usually
+ahead of PyPI):
+
+```bash
+./.venv/bin/pip install git+https://github.com/m-bain/whisperX.git
+```
+
+If that also fails due to a dependency conflict, the cleanest fix is to create a separate
+venv on Python 3.12 or 3.13 specifically for WhisperX (see troubleshooting below).
+
+For Python 3.9–3.13, the standard install works:
 
 ```bash
 ./.venv/bin/pip install whisperx
@@ -656,6 +667,21 @@ Run: `./.venv/bin/pip install faster-whisper`
 
 **"No module named whisperx"**
 Run: `./.venv/bin/pip install whisperx`
+
+**WhisperX install fails with "No matching distribution found for ctranslate2"**
+Your venv is running Python 3.14+, which the published PyPI package doesn't support yet.
+Try installing from GitHub first:
+```bash
+./.venv/bin/pip install git+https://github.com/m-bain/whisperX.git
+```
+If that still fails, create a dedicated venv on Python 3.12 or 3.13:
+```bash
+python3.12 -m venv .venv-whisperx
+./.venv-whisperx/bin/pip install whisperx
+```
+Then run `transcribe_whisperx.py` directly with that interpreter rather than via the
+main pipeline, or temporarily point `VENV_PYTHON` to `.venv-whisperx/bin/python3` in
+your environment when using `TRANSCRIPTION_ENGINE=whisperx`.
 
 **WhisperX diarization fails with "WHISPERX_HF_TOKEN is not set"**
 Follow the WhisperX setup steps in [Transcription Engines](#transcription-engines): create a
