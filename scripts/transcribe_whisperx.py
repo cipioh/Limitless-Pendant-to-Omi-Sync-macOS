@@ -68,15 +68,17 @@ from pathlib import Path
 # found even when the script is launched by launchd, which inherits a minimal PATH.
 os.environ["PATH"] = "/opt/homebrew/bin:" + os.environ.get("PATH", "")
 
-# Suppress noisy-but-harmless warnings that fire on every run:
-#   - torchcodec: can't load ffmpeg shared libs (uses the binary directly — works fine)
-#   - Lightning:  checkpoint version upgrade notice
-#   - whisperx:   INFO-level progress messages (VAD, language detection)
+# Suppress noisy-but-harmless output that fires on every run:
+#   - torchcodec: can't load ffmpeg shared libs (uses the ffmpeg binary directly — works fine)
+#   - Lightning:  "automatically upgraded your loaded checkpoint" notice (cosmetic, no action needed)
+#   - whisperx:   INFO/WARNING-level progress messages (VAD, language detection, no-speech clips)
 warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
-logging.getLogger("whisperx").setLevel(logging.WARNING)
-logging.getLogger("whisperx.asr").setLevel(logging.WARNING)
-logging.getLogger("whisperx.vads.pyannote").setLevel(logging.WARNING)
+warnings.filterwarnings("ignore", message=".*upgraded your loaded checkpoint.*")
+logging.getLogger("whisperx").setLevel(logging.ERROR)
+logging.getLogger("whisperx.asr").setLevel(logging.ERROR)
+logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
+logging.getLogger("whisperx.diarize").setLevel(logging.ERROR)
 logging.getLogger("lightning").setLevel(logging.ERROR)
 logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
 logging.getLogger("lightning_fabric").setLevel(logging.ERROR)
