@@ -160,6 +160,10 @@ def transcribe_directory(wav_dir: Path) -> int:
             result = model.transcribe(audio, language="en", batch_size=16)
             detected_language = result.get("language", "en")
 
+            if not result.get("segments"):
+                print(f"  No speech detected — skipping.", flush=True)
+                continue
+
             # --- Pass 2: Word-level alignment ---
             # Aligns each word to a precise timestamp so speaker boundaries can be
             # assigned at the word level rather than at the coarser segment level.
@@ -182,7 +186,7 @@ def transcribe_directory(wav_dir: Path) -> int:
 
             # --- Pass 3: Diarization ---
             print(f"  [3/3] Diarizing speakers...", flush=True)
-            if diarize_pipeline is not None and result.get("segments"):
+            if diarize_pipeline is not None:
                 try:
                     diarize_segments = diarize_pipeline(audio)
                     result = whisperx.assign_word_speakers(diarize_segments, result)

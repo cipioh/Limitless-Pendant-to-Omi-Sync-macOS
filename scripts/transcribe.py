@@ -114,6 +114,10 @@ def transcribe_directory(wav_dir: Path) -> int:
                     "text":  seg.text,
                 })
 
+            if not segments:
+                print(f"  No speech detected — skipping.", flush=True)
+                continue
+
             output = {
                 "segments": segments,
                 "language": info.language,
