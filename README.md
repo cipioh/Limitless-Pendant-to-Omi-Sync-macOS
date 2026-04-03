@@ -293,7 +293,8 @@ first run and saves the address for future sessions.
 
 See [Transcription Engines](#transcription-engines) below and set `TRANSCRIPTION_ENGINE` in
 `.env` accordingly. MacWhisper requires additional setup; faster-whisper is ready after one
-`pip` command.
+`pip` command; WhisperX requires a separate Python 3.13 venv (see setup instructions in
+that section).
 
 ---
 
@@ -408,13 +409,13 @@ handles this automatically as long as you create it at `.venv-whisperx`.
 ```bash
 # If you have Python 3.13 (check with: which python3.13)
 python3.13 -m venv .venv-whisperx
-./.venv-whisperx/bin/pip install whisperx
+./.venv-whisperx/bin/pip install whisperx python-dotenv
 ```
 
 ```bash
 # If you only have Python 3.12
 python3.12 -m venv .venv-whisperx
-./.venv-whisperx/bin/pip install whisperx
+./.venv-whisperx/bin/pip install whisperx python-dotenv
 ```
 
 The pipeline automatically uses `.venv-whisperx` for WhisperX transcription, so no
@@ -688,7 +689,7 @@ a dedicated venv using an older Python and install there — the pipeline picks 
 automatically:
 ```bash
 python3.13 -m venv .venv-whisperx   # or python3.12 if 3.13 isn't available
-./.venv-whisperx/bin/pip install whisperx
+./.venv-whisperx/bin/pip install whisperx python-dotenv
 ```
 Check which older Python versions you have: `ls /opt/homebrew/bin/python3.*`
 
