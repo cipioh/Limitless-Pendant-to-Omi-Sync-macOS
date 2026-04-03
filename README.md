@@ -418,7 +418,7 @@ acceptance:
 
 1. Create a free account at [huggingface.co](https://huggingface.co)
 2. Accept the license for each pyannote model (click **Agree and access repository**):
-   - [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+   - [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
    - [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
 3. Generate a read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
 4. Add it to `.env`:
@@ -692,7 +692,7 @@ HuggingFace account, accept the pyannote model licenses, generate a token, and a
 **WhisperX diarization fails with a 401 or access error**
 The HuggingFace token is present but the pyannote model licenses haven't been accepted yet.
 Visit both model pages and click **Agree and access repository**:
-- https://huggingface.co/pyannote/speaker-diarization-3.1
+- https://huggingface.co/pyannote/speaker-diarization-community-1
 - https://huggingface.co/pyannote/segmentation-3.0
 
 **Large backlog taking a very long time**
