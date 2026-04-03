@@ -20,9 +20,9 @@ that send_to_omi.py already knows how to use: set USER_SPEAKER_LABEL=SPEAKER_00
 is_user: true and everyone else's as is_user: false.
 
 REQUIREMENTS:
-    pip install whisperx
-    A free HuggingFace account + token to accept the pyannote model licenses:
-      https://huggingface.co/pyannote/speaker-diarization-3.1
+    pip install whisperx python-dotenv
+    A free HuggingFace account + token. Accept the model licenses at:
+      https://huggingface.co/pyannote/speaker-diarization-community-1
       https://huggingface.co/pyannote/segmentation-3.0
 
 CONFIGURATION (via .env):
@@ -58,13 +58,29 @@ EXIT CODES:
 
 import argparse
 import json
+import logging
 import os
 import sys
+import warnings
+from pathlib import Path
 
 # Ensure Homebrew's bin is on the PATH so ffmpeg (required by whisperx) is
 # found even when the script is launched by launchd, which inherits a minimal PATH.
 os.environ["PATH"] = "/opt/homebrew/bin:" + os.environ.get("PATH", "")
-from pathlib import Path
+
+# Suppress noisy-but-harmless warnings that fire on every run:
+#   - torchcodec: can't load ffmpeg shared libs (uses the binary directly — works fine)
+#   - Lightning:  checkpoint version upgrade notice
+#   - whisperx:   INFO-level progress messages (VAD, language detection)
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
+logging.getLogger("whisperx").setLevel(logging.WARNING)
+logging.getLogger("whisperx.asr").setLevel(logging.WARNING)
+logging.getLogger("whisperx.vads.pyannote").setLevel(logging.WARNING)
+logging.getLogger("lightning").setLevel(logging.ERROR)
+logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
+logging.getLogger("lightning_fabric").setLevel(logging.ERROR)
+
 from dotenv import load_dotenv
 
 ENV_PATH = Path(__file__).parent.parent / ".env"
@@ -95,7 +111,7 @@ def transcribe_directory(wav_dir: Path) -> int:
             "    WhisperX requires a HuggingFace token to run the pyannote diarization models.\n"
             "    1. Create a free account at https://huggingface.co\n"
             "    2. Accept the model licenses at:\n"
-            "         https://huggingface.co/pyannote/speaker-diarization-3.1\n"
+            "         https://huggingface.co/pyannote/speaker-diarization-community-1\n"
             "         https://huggingface.co/pyannote/segmentation-3.0\n"
             "    3. Generate a token at https://huggingface.co/settings/tokens\n"
             "    4. Add WHISPERX_HF_TOKEN=<your_token> to .env",
@@ -108,7 +124,7 @@ def transcribe_directory(wav_dir: Path) -> int:
     try:
         import whisperx
     except ImportError:
-        print("[!] whisperx is not installed. Run: pip install whisperx", flush=True)
+        print("[!] whisperx is not installed. Run: .venv-whisperx/bin/pip install whisperx python-dotenv", flush=True)
         return 1
 
     try:
@@ -116,6 +132,15 @@ def transcribe_directory(wav_dir: Path) -> int:
     except Exception as e:
         print(f"[!] Failed to load WhisperX model '{WHISPER_MODEL}': {e}", flush=True)
         return 1
+
+    # Build the diarization pipeline once and reuse across all files in this batch.
+    diarize_pipeline = None
+    try:
+        from whisperx.diarize import DiarizationPipeline
+        diarize_pipeline = DiarizationPipeline(token=HF_TOKEN, device=WHISPER_DEVICE)
+        print("Diarization model loaded.", flush=True)
+    except Exception as e:
+        print(f"[!] Failed to load diarization model ({e}). Transcription will proceed without speaker labels.", flush=True)
 
     any_failed = False
 
@@ -146,25 +171,19 @@ def transcribe_directory(wav_dir: Path) -> int:
                     return_char_alignments=False,
                 )
             except Exception as e:
-                print(f"  [!] Alignment failed ({e}). Proceeding with unaligned segments — speaker boundaries may be less accurate.", flush=True)
+                print(f"  [!] Alignment failed ({e}). Speaker boundaries may be less accurate.", flush=True)
 
             # --- Pass 3: Diarization ---
-            try:
-                from whisperx.diarize import DiarizationPipeline
-                diarize_model = DiarizationPipeline(
-                    model_name="pyannote/speaker-diarization-3.1",
-                    token=HF_TOKEN,
-                    device=WHISPER_DEVICE,
-                )
-                diarize_segments = diarize_model(audio)
-                result = whisperx.assign_word_speakers(diarize_segments, result)
-            except Exception as e:
-                print(f"  [!] Diarization failed ({e}). Saving transcript without speaker labels.", flush=True)
+            if diarize_pipeline is not None and result.get("segments"):
+                try:
+                    diarize_segments = diarize_pipeline(audio)
+                    result = whisperx.assign_word_speakers(diarize_segments, result)
+                except Exception as e:
+                    print(f"  [!] Diarization failed ({e}). Saving without speaker labels.", flush=True)
 
             # --- Build output segments ---
             segments = []
             for seg in result.get("segments", []):
-                # Speaker may be missing on a segment if diarization didn't cover it.
                 speaker = seg.get("speaker", "SPEAKER_00")
                 segments.append({
                     "start":   round(float(seg["start"]), 3),
