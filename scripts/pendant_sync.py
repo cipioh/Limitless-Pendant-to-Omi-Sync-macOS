@@ -22,13 +22,15 @@ It drives the complete 4-phase pipeline on a recurring schedule:
 
     Phase 3 — TRANSCRIBE:  If TRANSCRIPTION_ENGINE=faster-whisper, runs
                             transcribe.py directly as a subprocess (no polling
-                            needed). If TRANSCRIPTION_ENGINE=macwhisper (default),
-                            waits for MacWhisper's watch-folder automation to
-                            produce `.dote` or `.json` transcript files for every
-                            `.wav`. Polls every 30 seconds, up to 30 minutes.
-                            If a backlog of 5+ ready transcripts builds up while
-                            waiting, triggers a background upload pass so the
-                            pipeline doesn't stall entirely.
+                            needed). If TRANSCRIPTION_ENGINE=whisperx, runs
+                            transcribe_whisperx.py (same, but with speaker
+                            diarization). If TRANSCRIPTION_ENGINE=macwhisper
+                            (default), waits for MacWhisper's watch-folder
+                            automation to produce `.dote` or `.json` transcript
+                            files for every `.wav`. Polls every 30 seconds, up
+                            to 30 minutes. If a backlog of 5+ ready transcripts
+                            builds up while waiting, triggers a background upload
+                            pass so the pipeline doesn't stall entirely.
 
     Phase 4 — OMI IMPORT:  Call send_to_omi.py to quality-filter the transcripts
                             and POST them to the Omi API.
@@ -102,10 +104,13 @@ IDLE_BACK_SECONDS = 60    # <1 min idle = user has returned
 VENV_PYTHON = BASE_DIR / ".venv/bin/python3"
 
 # TRANSCRIPTION_ENGINE controls which tool handles Phase 3.
-#   macwhisper   — default. MacWhisper watches the wav_exports/ folder and
-#                  produces .dote files automatically. This script polls for them.
+#   macwhisper    — default. MacWhisper watches the wav_exports/ folder and
+#                   produces .dote files automatically. This script polls for them.
 #   faster-whisper — runs transcribe.py as a subprocess immediately after convert.py.
-#                  No GUI app or watch-folder needed. Requires: pip install faster-whisper.
+#                   No GUI app or watch-folder needed. Requires: pip install faster-whisper.
+#   whisperx      — runs transcribe_whisperx.py. Like faster-whisper but adds speaker
+#                   diarization (who said what). Requires: pip install whisperx and a
+#                   HuggingFace token set in WHISPERX_HF_TOKEN.
 TRANSCRIPTION_ENGINE = os.getenv("TRANSCRIPTION_ENGINE", "macwhisper").lower()
 
 # ==========================================
@@ -430,6 +435,15 @@ async def sync_cycle():
             await run_step_with_logging(
                 [str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "transcribe.py"), str(TRANSCRIPT_DIR)],
                 "Transcription (faster-whisper)"
+            )
+        elif TRANSCRIPTION_ENGINE == "whisperx":
+            # Run transcribe_whisperx.py directly — no polling needed.
+            # Like faster-whisper but adds speaker diarization: each segment
+            # gets a "speaker" field (SPEAKER_00, SPEAKER_01, etc.) that
+            # send_to_omi.py uses to correctly attribute is_user in Omi.
+            await run_step_with_logging(
+                [str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "transcribe_whisperx.py"), str(TRANSCRIPT_DIR)],
+                "Transcription (whisperx)"
             )
         else:
             # MacWhisper path: watch-folder polling.
