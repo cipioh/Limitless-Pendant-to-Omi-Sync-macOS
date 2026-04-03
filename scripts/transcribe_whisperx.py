@@ -152,6 +152,7 @@ def transcribe_directory(wav_dir: Path) -> int:
             try:
                 from whisperx.diarize import DiarizationPipeline
                 diarize_model = DiarizationPipeline(
+                    model_name="pyannote/speaker-diarization-3.1",
                     token=HF_TOKEN,
                     device=WHISPER_DEVICE,
                 )
