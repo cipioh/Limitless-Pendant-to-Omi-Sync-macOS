@@ -399,11 +399,27 @@ WhisperX runs three passes over each audio file:
 The extra passes make it slower than bare faster-whisper, but the tradeoff is structured,
 speaker-attributed output rather than one undifferentiated block of text.
 
+**WhisperX requires Python 3.10–3.13.** The project's main venv uses whatever Python
+version you have installed. If that's 3.14+, you need a separate venv — the pipeline
+handles this automatically as long as you create it at `.venv-whisperx`.
+
 **Setup:**
 
 ```bash
-./.venv/bin/pip install whisperx
+# If you have Python 3.13 (check with: which python3.13)
+python3.13 -m venv .venv-whisperx
+./.venv-whisperx/bin/pip install whisperx
 ```
+
+```bash
+# If you only have Python 3.12
+python3.12 -m venv .venv-whisperx
+./.venv-whisperx/bin/pip install whisperx
+```
+
+The pipeline automatically uses `.venv-whisperx` for WhisperX transcription, so no
+other configuration is needed. If `.venv-whisperx` doesn't exist, it falls back to the
+main venv and you'll get a clear error.
 
 The diarization models require a free HuggingFace account and a one-time license
 acceptance:
@@ -665,6 +681,16 @@ Run: `./.venv/bin/pip install faster-whisper`
 
 **"No module named whisperx"**
 Run: `./.venv/bin/pip install whisperx`
+
+**WhisperX install fails with "requires a different Python" or ctranslate2 error**
+WhisperX requires Python 3.10–3.13. Your main venv is likely on Python 3.14+. Create
+a dedicated venv using an older Python and install there — the pipeline picks it up
+automatically:
+```bash
+python3.13 -m venv .venv-whisperx   # or python3.12 if 3.13 isn't available
+./.venv-whisperx/bin/pip install whisperx
+```
+Check which older Python versions you have: `ls /opt/homebrew/bin/python3.*`
 
 **WhisperX diarization fails with "WHISPERX_HF_TOKEN is not set"**
 Follow the WhisperX setup steps in [Transcription Engines](#transcription-engines): create a

@@ -103,6 +103,12 @@ IDLE_BACK_SECONDS = 60    # <1 min idle = user has returned
 # to ensure all dependencies (bleak, opuslib, etc.) are available.
 VENV_PYTHON = BASE_DIR / ".venv/bin/python3"
 
+# WhisperX requires Python <3.14 and lives in a separate venv (.venv-whisperx).
+# If that venv exists, use it for transcribe_whisperx.py. If not, fall back to
+# the main venv — which will produce a clear ImportError explaining the problem.
+_whisperx_venv = BASE_DIR / ".venv-whisperx/bin/python3"
+WHISPERX_PYTHON = _whisperx_venv if _whisperx_venv.exists() else VENV_PYTHON
+
 # TRANSCRIPTION_ENGINE controls which tool handles Phase 3.
 #   macwhisper    — default. MacWhisper watches the wav_exports/ folder and
 #                   produces .dote files automatically. This script polls for them.
@@ -441,8 +447,10 @@ async def sync_cycle():
             # Like faster-whisper but adds speaker diarization: each segment
             # gets a "speaker" field (SPEAKER_00, SPEAKER_01, etc.) that
             # send_to_omi.py uses to correctly attribute is_user in Omi.
+            # Uses WHISPERX_PYTHON (the .venv-whisperx interpreter) because
+            # WhisperX requires Python <3.14 and won't install in the main venv.
             await run_step_with_logging(
-                [str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "transcribe_whisperx.py"), str(TRANSCRIPT_DIR)],
+                [str(WHISPERX_PYTHON), "-u", str(SCRIPTS_DIR / "transcribe_whisperx.py"), str(TRANSCRIPT_DIR)],
                 "Transcription (whisperx)"
             )
         else:
