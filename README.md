@@ -587,8 +587,8 @@ progress with `tail -f limitless_data/logs/automation.log`.
 ## Setting LED Brightness
 
 The pendant's LED brightness can be adjusted using `set_brightness.py` — a standalone
-utility that is separate from the main sync pipeline. Connect it occasionally when you want
-to dim or brighten the LED; it has no effect on sync behaviour.
+utility that is separate from the main sync pipeline. Run it when you want
+to dim or brighten the LED; it has no effect on sync behavior.
 
 If `PENDANT_MAC_ADDRESS` is already set in your `.env` file (populated automatically after
 the first successful sync), the script connects directly without scanning — a few seconds
