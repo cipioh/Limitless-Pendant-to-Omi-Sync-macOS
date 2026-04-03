@@ -314,11 +314,12 @@ See [Transcription Engines](#transcription-engines) below and set `TRANSCRIPTION
 
 \* Model weights download once on first run, then run fully offline.
 
-> **Speaker identification note:** All three engines label speakers by voice clustering —
+> **Speaker identification note:** MacWhisper and WhisperX label speakers by voice clustering —
 > they group voices together but cannot identify *who* each speaker is. Check your transcript
 > output to find which label consistently appears for your own voice, then set
 > `USER_SPEAKER_LABEL` in `.env` to that label so Omi marks your segments as `is_user: true`
 > and others as `is_user: false`. If left blank, all segments are marked as `is_user: true`.
+> faster-whisper has no diarization and does not produce speaker labels.
 
 ---
 
