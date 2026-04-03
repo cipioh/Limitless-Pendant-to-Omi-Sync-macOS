@@ -235,6 +235,20 @@ async def sync_cycle():
         "CAUGHT_UP"      — Cycle ran cleanly but there was nothing new to upload.
         "ERROR"          — A non-recoverable error occurred (BT reset limit hit).
     """
+    # Check for orphaned WAVs left over from a previous cycle — indicates
+    # MacWhisper may not be running or crashed during the last transcription pass.
+    orphaned_wavs = [
+        f for f in TRANSCRIPT_DIR.glob("*.wav")
+        if not (f.with_suffix(".dote").exists() or f.with_suffix(".json").exists())
+    ]
+    if orphaned_wavs:
+        log(f"[!] {len(orphaned_wavs)} WAV file(s) have no transcript from the previous cycle.")
+        notify_alert(
+            "⚠️ Transcription Issue Detected",
+            f"{len(orphaned_wavs)} audio file(s) were not transcribed last cycle. "
+            "Check that MacWhisper is running, or switch to faster-whisper."
+        )
+
     log("Starting Sync Cycle...", separator=True)
     notify("Limitless Sync", "Starting Pendant Sync...")
 
@@ -424,9 +438,9 @@ async def sync_cycle():
             # We poll every 30 seconds until all .wav files have a matching transcript
             # (.dote or .json), or until the 30-minute timeout is reached.
             #
-            # BACKGROUND UPLOAD SHORTCUT: If 5 or more transcripts are ready while
-            # we're still waiting for more, trigger a partial upload pass to prevent
-            # the pipeline from stalling on a large batch.
+            # Upload as soon as any transcript is ready — no need to batch since
+            # merging was removed. send_to_omi.py archives processed files, so
+            # repeated calls are safe no-ops when nothing new has arrived.
             def count_ready_transcripts():
                 return len(list(TRANSCRIPT_DIR.glob("*.dote"))) + len(list(TRANSCRIPT_DIR.glob("*.json")))
 
@@ -451,10 +465,9 @@ async def sync_cycle():
                     if i % 10 == 0:
                         log(f"Waiting for {expected_transcripts} transcripts... ({current_transcripts}/{expected_transcripts})")
 
-                    # Trigger background upload when 5+ files are ready and sitting idle.
-                    # The `i > 0` guard prevents a spurious trigger on the first iteration.
-                    if waiting_for_transcripts and i % 6 == 0 and i > 0 and current_transcripts >= 5:
-                        log(f"     | Backlog of {current_transcripts} files detected. Running background upload...")
+                    # Upload any ready transcripts on every tick.
+                    if waiting_for_transcripts and current_transcripts > 0:
+                        log(f"     | {current_transcripts} transcript(s) ready. Uploading...")
                         await run_step_with_logging([
                             str(VENV_PYTHON),
                             str(SCRIPTS_DIR / "send_to_omi.py"),

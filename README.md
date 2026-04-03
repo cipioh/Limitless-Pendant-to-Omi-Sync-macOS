@@ -310,7 +310,15 @@ models locally. It supports speaker diarization, meaning it labels each speaker 
 6. Set **Destination Folder** to the same `wav_exports` directory.
 
 MacWhisper must be **running** (not necessarily in the foreground) for the watch folder to
-work. The sync service will wait up to 30 minutes for transcripts to appear.
+work. The sync service will wait up to 30 minutes for transcripts to appear. If MacWhisper
+is quit or crashes mid-cycle, no transcripts will be produced and nothing will upload to Omi
+for that cycle — the untranscribed audio files remain in `wav_exports/` until MacWhisper
+processes them on a future cycle.
+
+> **Stall alert:** If a cycle ends without generating any transcripts, the following sync
+> cycle will fire a persistent macOS alert prompting you to check that MacWhisper is running.
+> If you prefer a zero-maintenance setup that doesn't require keeping an app running, switch
+> to `TRANSCRIPTION_ENGINE=faster-whisper` (see below). Trade-off: no speaker diarization.
 
 > **Speaker identification note:** MacWhisper labels speakers as "Speaker 1", "Speaker 2",
 > etc. based on voice clustering — it groups voices together but does not identify *who* they
