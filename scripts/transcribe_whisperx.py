@@ -150,7 +150,8 @@ def transcribe_directory(wav_dir: Path) -> int:
 
             # --- Pass 3: Diarization ---
             try:
-                diarize_model = whisperx.DiarizationPipeline(
+                from whisperx.diarize import DiarizationPipeline
+                diarize_model = DiarizationPipeline(
                     use_auth_token=HF_TOKEN,
                     device=WHISPER_DEVICE,
                 )
