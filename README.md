@@ -125,11 +125,12 @@ before uploading to the Omi API:
   and JSON files.
 - **Recording health monitoring** *(opt-in, for continuous recording mode)* — every sync
   checks whether the pendant's internal session counter has advanced since the last sync.
-  If the counter is stuck for 30+ minutes, a **persistent macOS alert dialog** pops up and
-  stays on screen until dismissed — you don't need to watch any logs. Based on
-  reverse-engineering the pendant's VAD (voice activity detection) protocol — each speech
-  pause creates a new session, making the session counter a reliable proxy for recording
-  health without any proprietary firmware access. Enable via
+  Uses a two-tier alert system: a **Warning** is logged after 5 minutes of no new sessions
+  (pendant may not be recording), and a **persistent macOS alert dialog** fires after 15
+  minutes (pendant has almost certainly stopped) — it stays on screen until dismissed so you
+  don't need to watch logs. Based on reverse-engineering the pendant's VAD (voice activity
+  detection) protocol — each speech pause creates a new session, making the session counter
+  a reliable proxy for recording health without any proprietary firmware access. Enable via
   `PENDANT_HEALTH_MONITORING=enabled` in `.env` (recommended only for always-on recording).
 - **Multi-format transcript support** — accepts `.dote` (MacWhisper), `.json` (faster-whisper
   / whisper.cpp / standard Whisper output), and `.srt` (SubRip subtitles).
@@ -595,9 +596,9 @@ session ID advances 30–200+ times per hour. Splitting on session ID changes wo
 dozens of tiny files per hour and fragment conversations at every breath.
 
 The session ID *does* have one genuine use: as a recording health proxy. Because it advances
-predictably during active speech, a counter that hasn't moved in 30+ minutes is a reliable
-signal that the pendant has silently stopped recording. This is what
-`PENDANT_HEALTH_MONITORING` uses.
+predictably during active speech (even picking up ambient room noise), a stagnant counter is a
+reliable signal that the pendant has stopped recording. `PENDANT_HEALTH_MONITORING` uses a
+two-tier threshold: Warning after 5 minutes of no new sessions, Unhealthy alert after 15.
 
 **Signal 3 — Timestamp gap (current implementation)**
 Each flash page carries a millisecond-precision timestamp. A gap of 60+ seconds between
