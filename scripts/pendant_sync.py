@@ -362,6 +362,8 @@ async def sync_cycle():
                 log(decoded_line)
                 if "Pendant Status: Unhealthy" in decoded_line:
                     notify_alert("⚠️ Pendant Not Recording", "Hold button 2s to stop, hold again to restart.")
+            elif "[~]" in decoded_line:
+                log(f"     | {decoded_line}")
             elif any(x in decoded_line for x in ["Downloaded", "Found", "Battery", "Oldest", "Newest", "First", "Skipping", "Session", "Health", "File created", "Phantom", "Aborting", "Pendant"]):
                 log(f"     | {decoded_line}")
             elif any(x in decoded_line for x in ["Connected", "Downloading", "Starting"]):

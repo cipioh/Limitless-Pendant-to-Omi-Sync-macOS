@@ -108,7 +108,7 @@ See the approach-specific docs for what happens after Phase 1.
 - **Natural gap chunking** — looks for a natural silence boundary in the 1,500–2,000 page zone rather than always hard-cutting at 2,000 pages
 - **Bluetooth circuit breaker** — power-cycles the BT chip via `blueutil` and retries up to 15×  if the radio stalls mid-download
 - **Streaming crash recovery** — audio written to `.part` file continuously; a crash never loses more than the last few seconds
-- **Recording health monitoring** *(opt-in)* — fires a persistent macOS alert if the pendant silently stops recording; based on reverse-engineered VAD session counter protocol
+- **Recording health monitoring** *(opt-in)* — two-tier alert: Warning logged after 5 min of no new sessions, persistent macOS alert after 15 min; based on reverse-engineered VAD session counter protocol
 
 ---
 
@@ -275,7 +275,8 @@ were evaluated:
   seconds). Not a conversation signal; reflects the audio encoder lifecycle.
 - **Session ID** — increments on every VAD event (every pause in speech). Advances 30–200+
   times per hour during active conversation. Would fragment every recording into dozens of
-  tiny files. Only useful as a recording health proxy — which is what `PENDANT_HEALTH_MONITORING` uses.
+  tiny files. Only useful as a recording health proxy — `PENDANT_HEALTH_MONITORING` uses a
+  two-tier threshold: Warning after 5 min of no new sessions, Unhealthy alert after 15 min.
 - **Timestamp gap (current)** — a 60-second gap between consecutive page timestamps means the
   pendant was genuinely silent. This correctly captures transitions between meetings, lunch
   breaks, and end of day without false splits during normal conversational pauses.

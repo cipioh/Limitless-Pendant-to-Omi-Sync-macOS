@@ -2043,7 +2043,8 @@ async def main(argv: list[str] | None = None) -> int:
                 # Session health check: compare with previous sync's session ID.
                 # During healthy recording the session ID advances ~30-60 times per hour
                 # (the pendant creates a new session on every speech pause via VAD).
-                # A zero delta over a long interval means the pendant stopped recording.
+                # A zero delta over a short interval means the pendant may have stopped recording.
+                # Thresholds: Warning after 5 min of no sessions, Unhealthy (alert) after 15 min.
                 # Only meaningful for continuous/always-on recording — opt in via .env.
                 health_monitoring = os.getenv("PENDANT_HEALTH_MONITORING", "").lower() in ("1", "true", "enabled", "yes")
                 session_state_file = output_dir / ".session_state"
@@ -2057,8 +2058,10 @@ async def main(argv: list[str] | None = None) -> int:
                         delta = storage_session - prev_session
                         if elapsed_min >= 2 and health_monitoring:
                             rate = delta / (elapsed_min / 60)
-                            if delta == 0 and elapsed_min >= 30:
+                            if delta == 0 and elapsed_min >= 15:
                                 print("[!] Pendant Status: Unhealthy - Stop and restart recording using pendant button to reset.", flush=True)
+                            elif delta == 0 and elapsed_min >= 5:
+                                print("[~] Pendant Status: Warning - No new sessions detected, pendant may not be recording.", flush=True)
                             else:
                                 print(f"Pendant Status: Healthy (+{delta} sessions in {elapsed_min:.0f}min, {rate:.0f}/hr)", flush=True)
                     except Exception:
