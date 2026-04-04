@@ -63,6 +63,7 @@ import os
 import sys
 import time
 import traceback
+import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv, set_key
@@ -178,13 +179,27 @@ def notify_alert(title, message):
     Sends a persistent macOS alert dialog via AppleScript (display alert).
     Unlike display notification, this stays on screen until the user clicks OK —
     use for critical conditions that require user action (e.g. pendant not recording).
-    Launched with Popen (fire-and-forget) so it doesn't block the sync loop.
+
+    Uses a flag file to prevent stacking duplicate alerts. If an alert is already
+    on screen (flag exists), this call is silently skipped. Once the user dismisses
+    the alert, the flag is cleared so future alerts can fire again.
     """
-    subprocess.Popen(
-        ["osascript", "-e", f'display alert "{title}" message "{message}" as warning'],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    flag_file = BASE_DIR / "limitless_data" / "logs" / "alert_active.flag"
+    if flag_file.exists():
+        return
+
+    def _show():
+        flag_file.touch()
+        try:
+            subprocess.run(
+                ["osascript", "-e", f'display alert "{title}" message "{message}" as warning'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        finally:
+            flag_file.unlink(missing_ok=True)
+
+    threading.Thread(target=_show, daemon=True).start()
 
 def log(message, separator=False):
     """
