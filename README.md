@@ -34,7 +34,7 @@ Omi — every hour, automatically, without depending on a phone or the native ap
 |---|---|---|---|---|---|
 | [Omi Cloud Sync](docs/approach-omi-cloud.md) | Deepgram (Omi cloud) | Yes — biometric via Omi profile | Yes | Unlimited plan recommended¹ | Low |
 | [Local → Omi](docs/approach-local-to-omi.md) | Whisper (on your Mac) | Voice clustering only | Upload only | Free tier sufficient | Medium |
-| [Fully Offline](docs/approach-offline.md) *(partial)* | Whisper (on your Mac) | Voice clustering only | No | None | Medium |
+| [Fully Offline](docs/approach-offline.md) *(partial)* | Whisper (on your Mac) | Voice clustering only | No | None (No Omi Integration)| Medium |
 
 ¹ Omi's free plan includes 1,200 cloud transcription minutes/month. The omi_cloud approach consumes these minutes because Omi runs Deepgram on your audio server-side. A typical day of pendant recording (5–8 hours) would exhaust the free tier within days. The local→omi approach sends only pre-transcribed text, so it doesn't touch the quota at all.
 
@@ -53,7 +53,11 @@ pipeline. Three local engine options: MacWhisper (GUI, speaker diarization), fas
 
 **Fully Offline** — collect and transcribe locally with no upload step. *Partially
 implemented:* download, convert, and transcribe work fully. Local summarization and
-searchable query capability have not been built yet.
+searchable query capability have not been built yet. This completely removes Omi from the 
+equation, and you are basically running your own transcription and summarization service.
+While a great solution for fully offline processing, you do lose the benefit of the services
+Omi has to offer. With that said, this option gives you complete control over all of the
+data, where it sits, and how it is processed. 
 
 ---
 
