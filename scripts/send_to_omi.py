@@ -108,7 +108,7 @@ def clean_old_discards(discard_dir: Path, days=7):
             except Exception as e:
                 print(f"  [!] Could not delete {filepath.name}: {e}", flush=True)
 
-def clean_old_synced(synced_dir: Path, json_days=0, wav_days=0):
+def clean_old_synced(synced_dir: Path, json_days=0, wav_days=0, bin_days=0):
     """
     Deletes aged-out files in the synced_to_omi folder.
 
@@ -134,6 +134,12 @@ def clean_old_synced(synced_dir: Path, json_days=0, wav_days=0):
             try:
                 filepath.unlink()
                 print(f"Auto-deleted old synced WAV: {filepath.name}")
+            except Exception as e:
+                print(f"  [!] Could not delete {filepath.name}: {e}", flush=True)
+        elif filepath.suffix == ".bin" and bin_days > 0 and age > bin_days * 86400:
+            try:
+                filepath.unlink()
+                print(f"Auto-deleted old synced BIN: {filepath.name}")
             except Exception as e:
                 print(f"  [!] Could not delete {filepath.name}: {e}", flush=True)
 
@@ -286,6 +292,7 @@ def upload_transcripts(input_dir: str, api_key: str):
     synced_wav_action    = os.getenv("SYNCED_WAV_ACTION", "keep").lower()
     synced_wav_days      = int(os.getenv("SYNCED_WAV_RETENTION_DAYS", "0"))
     synced_json_days     = int(os.getenv("SYNCED_JSON_RETENTION_DAYS", "0"))
+    synced_bin_days      = int(os.getenv("SYNCED_BIN_RETENTION_DAYS", "0"))
 
     # USER_SPEAKER_LABEL: if set (e.g. "Speaker 1"), only segments from that
     # speaker get is_user: true. All others get false. This lets Omi correctly
@@ -302,7 +309,7 @@ def upload_transcripts(input_dir: str, api_key: str):
     # Only run discard cleanup when we're keeping files (not deleting immediately).
     if discard_action == "keep":
         clean_old_discards(discard_dir, days=discard_days)
-    clean_old_synced(synced_dir, json_days=synced_json_days, wav_days=synced_wav_days)
+    clean_old_synced(synced_dir, json_days=synced_json_days, wav_days=synced_wav_days, bin_days=synced_bin_days)
 
     # Process files in chronological order so Omi receives conversations
     # in the order they actually happened. Accepts .dote (MacWhisper), .json

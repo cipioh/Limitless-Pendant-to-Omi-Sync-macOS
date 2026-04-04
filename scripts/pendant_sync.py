@@ -31,9 +31,16 @@ It drives the complete 4-phase pipeline on a recurring schedule:
                             to 30 minutes. If a backlog of 5+ ready transcripts
                             builds up while waiting, triggers a background upload
                             pass so the pipeline doesn't stall entirely.
+                            If TRANSCRIPTION_ENGINE=omi_cloud, Phases 2, 3, and
+                            4 are replaced entirely: the raw `.bin` files are
+                            uploaded directly to Omi's /v2/sync-local-files API,
+                            which runs Deepgram transcription + speaker ID
+                            server-side (same as the Omi mobile app's offline
+                            batch sync). No local whisper or pyannote needed.
 
     Phase 4 — OMI IMPORT:  Call send_to_omi.py to quality-filter the transcripts
-                            and POST them to the Omi API.
+                            and POST them to the Omi API. Skipped when
+                            TRANSCRIPTION_ENGINE=omi_cloud (handled in Phase 3).
 
 SERVICE LOOP:
     After each cycle, the orchestrator sleeps for CHECK_INTERVAL_SECONDS (1 hour)
@@ -83,6 +90,13 @@ LOG_FILE = BASE_DIR / "limitless_data/logs/automation.log"
 OMI_KEY = os.getenv("OMI_API_KEY")
 PENDANT_MAC_ADDRESS = os.getenv("PENDANT_MAC_ADDRESS")
 
+# omi_cloud engine credentials (only needed when TRANSCRIPTION_ENGINE=omi_cloud).
+# sync_omi_cloud.py reads these directly from env; pendant_sync.py just validates
+# that at least one is present so the cycle fails fast rather than mid-sync.
+OMI_FIREBASE_TOKEN         = os.getenv("OMI_FIREBASE_TOKEN", "")
+OMI_FIREBASE_REFRESH_TOKEN = os.getenv("OMI_FIREBASE_REFRESH_TOKEN", "")
+OMI_FIREBASE_WEB_API_KEY   = os.getenv("OMI_FIREBASE_WEB_API_KEY", "***REDACTED***")
+
 # How long to sleep between sync cycle attempts. 3600 = 1 hour.
 CHECK_INTERVAL_SECONDS = 3600
 
@@ -117,6 +131,11 @@ WHISPERX_PYTHON = _whisperx_venv if _whisperx_venv.exists() else VENV_PYTHON
 #   whisperx      — runs transcribe_whisperx.py. Like faster-whisper but adds speaker
 #                   diarization (who said what). Requires: pip install whisperx and a
 #                   HuggingFace token set in WHISPERX_HF_TOKEN.
+#   omi_cloud     — skips convert + transcribe entirely. Uploads the raw .bin files
+#                   directly to Omi's /v2/sync-local-files endpoint (same path as the
+#                   Omi mobile app's offline batch sync). Omi runs Deepgram Nova-3
+#                   transcription + speaker identification server-side. Requires
+#                   OMI_EMAIL and OMI_PASSWORD in .env. No local ML dependencies needed.
 TRANSCRIPTION_ENGINE = os.getenv("TRANSCRIPTION_ENGINE", "macwhisper").lower()
 
 # ==========================================
@@ -125,7 +144,14 @@ TRANSCRIPTION_ENGINE = os.getenv("TRANSCRIPTION_ENGINE", "macwhisper").lower()
 # Fail fast with a clear message rather than crashing cryptically later.
 if not PENDANT_MAC_ADDRESS:
     sys.exit("ERROR: PENDANT_MAC_ADDRESS is not set in .env — cannot connect to pendant.")
-if not OMI_KEY:
+if TRANSCRIPTION_ENGINE == "omi_cloud":
+    if not OMI_FIREBASE_TOKEN and not OMI_FIREBASE_REFRESH_TOKEN:
+        sys.exit(
+            "ERROR: TRANSCRIPTION_ENGINE=omi_cloud requires Firebase credentials in .env.\n"
+            "Set OMI_FIREBASE_TOKEN (Bearer token from browser) and/or\n"
+            "OMI_FIREBASE_REFRESH_TOKEN (from browser IndexedDB → stsTokenManager.refreshToken)."
+        )
+elif not OMI_KEY:
     sys.exit("ERROR: OMI_API_KEY is not set in .env — cannot upload to Omi.")
 
 
@@ -261,6 +287,7 @@ async def sync_cycle():
         )
 
     log("Starting Sync Cycle...", separator=True)
+    log(f"Transcription engine: {TRANSCRIPTION_ENGINE}")
     notify("Limitless Sync", "Starting Pendant Sync...")
 
     any_data_downloaded = False
@@ -361,8 +388,9 @@ async def sync_cycle():
             # Convert this chunk's .bin files to .wav now so MacWhisper can start
             # transcribing while the next chunk downloads. Only clean up .bin files
             # if conversion completes cleanly (exit 0).
+            # Skip for omi_cloud — .bin files are kept and uploaded directly at the end.
             bin_files_chunk = list(DOWNLOAD_DIR.glob("*.bin"))
-            if bin_files_chunk:
+            if bin_files_chunk and TRANSCRIPTION_ENGINE != "omi_cloud":
                 chunk_convert_exit = await run_step_with_logging(
                     [str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "convert.py"), str(DOWNLOAD_DIR)],
                     "WAV Conversion (mid-cycle chunk)"
@@ -409,6 +437,38 @@ async def sync_cycle():
             log(f"Download script failed with Exit Code {returncode}. Aborting cycle.")
             notify("Limitless Sync", "Script error — check log")
             return "ERROR"
+
+    # ==========================================
+    # omi_cloud ENGINE: skip convert + transcribe + send_to_omi
+    # ==========================================
+    # When using omi_cloud, upload the raw .bin files directly to Omi's API.
+    # Omi runs Deepgram transcription and speaker ID server-side, exactly like
+    # the mobile app's offline batch sync. Phases 2, 3, and 4 are bypassed.
+    if TRANSCRIPTION_ENGINE == "omi_cloud":
+        bin_files = list(DOWNLOAD_DIR.glob("*.bin"))
+        if bin_files:
+            any_data_downloaded = True
+            cloud_exit = await run_step_with_logging([
+                str(VENV_PYTHON), "-u",
+                str(SCRIPTS_DIR / "sync_omi_cloud.py"),
+                str(DOWNLOAD_DIR),
+                "--firebase-key", OMI_FIREBASE_WEB_API_KEY,
+            ], "Omi Cloud Sync")
+
+            if cloud_exit == 0:
+                log("Cycle complete.")
+                notify("Limitless Sync", "Pendant Sync Complete")
+                return "PROCESSED_DATA"
+            else:
+                log("[!] Omi Cloud Sync failed — check log for details.")
+                notify("Limitless Sync", "Cloud sync failed — check log")
+                return "ERROR"
+        else:
+            log("Cycle complete.")
+            if pendant_not_found and not any_data_downloaded:
+                return "ERROR"
+            notify("Limitless Sync", "Pendant Sync — Already up to date")
+            return "CAUGHT_UP"
 
     # ==========================================
     # PHASE 2: CONVERT
