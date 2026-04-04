@@ -57,10 +57,9 @@ from dotenv import load_dotenv
 # CONSTANTS
 # ==========================================
 
-# Public Firebase Web API Key embedded in the Omi mobile app.
-# This is not a secret — it's shipped in the open-source app and identifies
-# the Firebase project, not any individual user's account.
-DEFAULT_FIREBASE_WEB_API_KEY = "***REDACTED***"
+# Firebase Web API Key — loaded from OMI_FIREBASE_WEB_API_KEY in .env.
+# No default here; see .env.example for setup instructions.
+DEFAULT_FIREBASE_WEB_API_KEY = ""
 
 FIREBASE_SIGN_IN_URL = (
     "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={key}"
@@ -436,25 +435,23 @@ def main():
         job_result = upload_result
 
     # Step 4: Print summary.
-    new_mems   = job_result.get("new_memories", [])
-    upd_mems   = job_result.get("updated_memories", [])
+    new_convos = job_result.get("new_memories", [])
     errors     = job_result.get("errors", [])
 
     print(f"\n--- Omi Cloud Sync Summary ---")
-    print(f"  New conversations/memories : {len(new_mems)}")
-    print(f"  Updated memories           : {len(upd_mems)}")
-    print(f"  Failed segments            : {job_result.get('failed_segments', 0)}")
+    print(f"  New conversations : {len(new_convos)}")
+    print(f"  Failed segments   : {job_result.get('failed_segments', 0)}")
     if errors:
         for err in errors:
             print(f"  [!] {err}")
 
     # Step 5: Cleanup — only if Omi confirmed it received something.
-    # An empty result with 0 new and 0 updated could mean the upload silently
+    # An empty result with 0 new conversations could mean the upload silently
     # failed. Require at least one non-empty field before moving files.
-    if new_mems or upd_mems or job_result.get("failed_segments", 0) > 0:
+    if new_convos or job_result.get("failed_segments", 0) > 0:
         cleanup_bins(bin_dir, synced_dir, args.synced_bin_action)
     else:
-        print("[!] No conversations or memories returned — files NOT moved. Check Omi app before retrying.")
+        print("[!] No conversations returned — files NOT moved. Check Omi app before retrying.")
         sys.exit(1)
 
     print("Done.")

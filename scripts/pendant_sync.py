@@ -95,7 +95,7 @@ PENDANT_MAC_ADDRESS = os.getenv("PENDANT_MAC_ADDRESS")
 # that at least one is present so the cycle fails fast rather than mid-sync.
 OMI_FIREBASE_TOKEN         = os.getenv("OMI_FIREBASE_TOKEN", "")
 OMI_FIREBASE_REFRESH_TOKEN = os.getenv("OMI_FIREBASE_REFRESH_TOKEN", "")
-OMI_FIREBASE_WEB_API_KEY   = os.getenv("OMI_FIREBASE_WEB_API_KEY", "***REDACTED***")
+OMI_FIREBASE_WEB_API_KEY   = os.getenv("OMI_FIREBASE_WEB_API_KEY", "")
 
 # How long to sleep between sync cycle attempts. 3600 = 1 hour.
 CHECK_INTERVAL_SECONDS = 3600
@@ -445,6 +445,22 @@ async def sync_cycle():
     # Omi runs Deepgram transcription and speaker ID server-side, exactly like
     # the mobile app's offline batch sync. Phases 2, 3, and 4 are bypassed.
     if TRANSCRIPTION_ENGINE == "omi_cloud":
+        # Sweep wav_exports for any WAV files left over from a previous engine.
+        # They can never be processed in omi_cloud mode; move or discard them now.
+        stray_wavs = list(TRANSCRIPT_DIR.glob("*.wav"))
+        if stray_wavs:
+            _discard_action = os.getenv("DISCARD_ACTION", "keep").lower()
+            _discard_dir = BASE_DIR / "limitless_data" / "discarded_audio"
+            if _discard_action == "keep":
+                _discard_dir.mkdir(parents=True, exist_ok=True)
+                for wav in stray_wavs:
+                    wav.rename(_discard_dir / wav.name)
+                    log(f"Moved orphan WAV to discarded_audio: {wav.name}")
+            else:
+                for wav in stray_wavs:
+                    wav.unlink(missing_ok=True)
+                    log(f"Deleted orphan WAV: {wav.name}")
+
         bin_files = list(DOWNLOAD_DIR.glob("*.bin"))
         if bin_files:
             any_data_downloaded = True
