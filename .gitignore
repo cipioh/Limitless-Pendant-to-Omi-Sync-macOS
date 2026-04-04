@@ -1,5 +1,6 @@
 # Secure Environment Variables
 .env
+.firebase_token_cache.json
 
 # Virtual Environments
 .venv/
