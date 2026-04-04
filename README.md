@@ -304,6 +304,13 @@ unknown (firmware issue). Fix: hold the button 2 seconds to stop, hold again to 
 `PENDANT_HEALTH_MONITORING=enabled`, a persistent macOS alert fires automatically when this
 is detected.
 
+**Offline sync creates a new conversation per upload** *(local → Omi approach)*
+The `omi_cloud` engine is significantly better at conversation continuity — even when audio
+is uploaded across multiple sync cycles, Omi correctly appends to existing conversations
+rather than creating a new one each time. The local → Omi approach (`send_to_omi.py`) does
+not yet replicate this behavior; each upload tends to start a fresh conversation. This is a
+known limitation to be addressed.
+
 ---
 
 ## Troubleshooting

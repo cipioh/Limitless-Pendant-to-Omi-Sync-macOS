@@ -428,11 +428,16 @@ def main():
     upload_result = upload_bins(bin_dir, id_token)
 
     # Step 3: Poll if async (v2), or use result directly if sync (v1).
+    job_completed = False
     if "job_id" in upload_result:
-        result = poll_job(upload_result["job_id"], id_token)
-        job_result = result.get("result") or {}
+        poll_data = poll_job(upload_result["job_id"], id_token)
+        job_result = poll_data.get("result") or {}
+        # poll_job only returns for completed/partial_failure; failed calls sys.exit.
+        job_completed = poll_data.get("status") in ("completed", "partial_failure")
     else:
+        # Synchronous v1 response — treat any non-empty reply as success.
         job_result = upload_result
+        job_completed = bool(upload_result)
 
     # Step 4: Print summary.
     new_convos = job_result.get("new_memories", [])
@@ -445,13 +450,13 @@ def main():
         for err in errors:
             print(f"  [!] {err}")
 
-    # Step 5: Cleanup — only if Omi confirmed it received something.
-    # An empty result with 0 new conversations could mean the upload silently
-    # failed. Require at least one non-empty field before moving files.
-    if new_convos or job_result.get("failed_segments", 0) > 0:
+    # Step 5: Cleanup — trust job completion status rather than conversation count.
+    # Omi doesn't always populate new_memories in the immediate response; conversations
+    # may appear in the app shortly after. Job completion is the authoritative signal.
+    if job_completed:
         cleanup_bins(bin_dir, synced_dir, args.synced_bin_action)
     else:
-        print("[!] No conversations returned — files NOT moved. Check Omi app before retrying.")
+        print("[!] Job did not complete cleanly — files NOT moved.")
         sys.exit(1)
 
     print("Done.")

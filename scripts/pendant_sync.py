@@ -272,18 +272,19 @@ async def sync_cycle():
         "CAUGHT_UP"      — Cycle ran cleanly but there was nothing new to upload.
         "ERROR"          — A non-recoverable error occurred (BT reset limit hit).
     """
-    # Check for orphaned WAVs left over from a previous cycle — indicates
-    # MacWhisper may not be running or crashed during the last transcription pass.
+    # Check for orphaned WAVs left over from a previous cycle — no transcript
+    # was produced, so they were never uploaded. Could be a crashed transcription
+    # pass, a mid-cycle engine switch, or MacWhisper not running.
     orphaned_wavs = [
         f for f in TRANSCRIPT_DIR.glob("*.wav")
         if not (f.with_suffix(".dote").exists() or f.with_suffix(".json").exists())
     ]
     if orphaned_wavs:
-        log(f"[!] {len(orphaned_wavs)} WAV file(s) have no transcript from the previous cycle.")
+        log(f"[!] {len(orphaned_wavs)} WAV file(s) in wav_exports have no transcript and were never uploaded.")
         notify_alert(
-            "⚠️ Transcription Issue Detected",
-            f"{len(orphaned_wavs)} audio file(s) were not transcribed last cycle. "
-            "Check that MacWhisper is running, or switch to faster-whisper."
+            "⚠️ Unprocessed Audio Files",
+            f"{len(orphaned_wavs)} WAV file(s) in wav_exports were never transcribed or uploaded. "
+            "Please review and manually process or remove them."
         )
 
     log("Starting Sync Cycle...", separator=True)
@@ -445,22 +446,6 @@ async def sync_cycle():
     # Omi runs Deepgram transcription and speaker ID server-side, exactly like
     # the mobile app's offline batch sync. Phases 2, 3, and 4 are bypassed.
     if TRANSCRIPTION_ENGINE == "omi_cloud":
-        # Sweep wav_exports for any WAV files left over from a previous engine.
-        # They can never be processed in omi_cloud mode; move or discard them now.
-        stray_wavs = list(TRANSCRIPT_DIR.glob("*.wav"))
-        if stray_wavs:
-            _discard_action = os.getenv("DISCARD_ACTION", "keep").lower()
-            _discard_dir = BASE_DIR / "limitless_data" / "discarded_audio"
-            if _discard_action == "keep":
-                _discard_dir.mkdir(parents=True, exist_ok=True)
-                for wav in stray_wavs:
-                    wav.rename(_discard_dir / wav.name)
-                    log(f"Moved orphan WAV to discarded_audio: {wav.name}")
-            else:
-                for wav in stray_wavs:
-                    wav.unlink(missing_ok=True)
-                    log(f"Deleted orphan WAV: {wav.name}")
-
         bin_files = list(DOWNLOAD_DIR.glob("*.bin"))
         if bin_files:
             any_data_downloaded = True
