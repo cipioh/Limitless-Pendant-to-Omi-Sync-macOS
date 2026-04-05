@@ -79,6 +79,11 @@ TOKEN_EXPIRY_BUFFER_SECONDS = 60
 POLL_INTERVAL_SECONDS = 5
 POLL_TIMEOUT_SECONDS  = 600  # 10 minutes
 
+# Maximum total payload size per upload request.
+# Omi's server rejects requests larger than ~100 MB (returns 413).
+# Files are batched so each POST stays comfortably under this limit.
+MAX_UPLOAD_BATCH_BYTES = 20 * 1024 * 1024  # 20 MB
+
 
 # ==========================================
 # FIREBASE AUTHENTICATION
@@ -237,32 +242,25 @@ def make_upload_name(bin_path: Path) -> str:
 # UPLOAD
 # ==========================================
 
-def upload_bins(bin_dir: Path, id_token: str) -> dict | None:
+def _post_bin_batch(batch: list[Path], id_token: str, batch_num: int, total_batches: int) -> dict:
     """
-    POSTs all .bin files in bin_dir to Omi's sync endpoint as multipart/form-data.
-
-    Tries /v2/sync-local-files first (async, returns job_id via 202).
-    If the server responds with 200 instead, treats it as a /v1 synchronous
-    result and returns the parsed response dict directly (no polling needed).
+    POSTs a single batch of .bin files to Omi's sync endpoint.
 
     Returns:
-      - A dict with "job_id" key → caller should poll.
-      - A dict with "new_memories" / "updated_memories" keys → v1 result, done.
+      - A dict with "job_id" key → caller should poll (202 async).
+      - A dict with "new_memories" / "updated_memories" keys → v1 sync result (200).
       - Exits with code 1 on error.
     """
-    bin_files = sorted(bin_dir.glob("*.bin"))
-    if not bin_files:
-        print("No .bin files found to upload.")
-        sys.exit(0)
-
-    print(f"Uploading {len(bin_files)} .bin file(s) to Omi cloud sync...")
+    batch_label = f"batch {batch_num}/{total_batches}" if total_batches > 1 else "upload"
+    total_mb    = sum(bf.stat().st_size for bf in batch) / (1024 * 1024)
+    print(f"  [{batch_label}] {len(batch)} file(s), {total_mb:.1f} MB")
 
     file_handles = []
     files_param  = []
     try:
-        for bf in bin_files:
+        for bf in batch:
             upload_name = make_upload_name(bf)
-            print(f"  {bf.name}  →  {upload_name}")
+            print(f"    {bf.name}  →  {upload_name}")
             fh = open(bf, "rb")
             file_handles.append(fh)
             files_param.append(("files", (upload_name, fh, "application/octet-stream")))
@@ -278,17 +276,61 @@ def upload_bins(bin_dir: Path, id_token: str) -> dict | None:
             fh.close()
 
     if resp.status_code == 202:
-        # v2 async: poll for completion.
         data = resp.json()
-        print(f"Upload accepted (async). job_id={data.get('job_id')}, total_segments={data.get('total_segments', '?')}")
+        print(f"    → Accepted (async). job_id={data.get('job_id')}, segments={data.get('total_segments', '?')}")
         return data
 
     if resp.status_code == 200:
-        print(f"Upload complete (synchronous response). Raw: {resp.text[:500]}")
+        print(f"    → Complete (sync). Raw: {resp.text[:200]}")
         return resp.json()
 
     print(f"[!] Upload failed ({resp.status_code}): {resp.text}")
     sys.exit(1)
+
+
+def upload_bins(bin_dir: Path, id_token: str) -> list[dict]:
+    """
+    POSTs all .bin files in bin_dir to Omi's sync endpoint as multipart/form-data.
+
+    Files are split into size-based batches (MAX_UPLOAD_BATCH_BYTES each) so that
+    large sync sets (e.g. a full day's recordings) don't trigger a 413 from the
+    server's request-size limit.
+
+    Returns a list of result dicts — one per batch — each being either:
+      - {"job_id": ..., ...}  → async v2 response, caller should poll.
+      - {"new_memories": ...} → sync v1 response, no polling needed.
+    """
+    bin_files = sorted(bin_dir.glob("*.bin"))
+    if not bin_files:
+        print("No .bin files found to upload.")
+        sys.exit(0)
+
+    # Split files into batches where each batch stays under MAX_UPLOAD_BATCH_BYTES.
+    batches: list[list[Path]] = []
+    current_batch: list[Path] = []
+    current_size = 0
+    for bf in bin_files:
+        file_size = bf.stat().st_size
+        # If a single file alone exceeds the limit, send it solo rather than skipping it.
+        if current_batch and current_size + file_size > MAX_UPLOAD_BATCH_BYTES:
+            batches.append(current_batch)
+            current_batch = []
+            current_size  = 0
+        current_batch.append(bf)
+        current_size += file_size
+    if current_batch:
+        batches.append(current_batch)
+
+    total_mb = sum(bf.stat().st_size for bf in bin_files) / (1024 * 1024)
+    print(f"Uploading {len(bin_files)} .bin file(s) to Omi cloud sync "
+          f"({total_mb:.1f} MB across {len(batches)} batch(es))...")
+
+    results = []
+    for i, batch in enumerate(batches, start=1):
+        result = _post_bin_batch(batch, id_token, batch_num=i, total_batches=len(batches))
+        results.append(result)
+
+    return results
 
 
 # ==========================================
@@ -424,36 +466,44 @@ def main():
         direct_refresh_token=os.getenv("OMI_FIREBASE_REFRESH_TOKEN", ""),
     )
 
-    # Step 2: Upload.
-    upload_result = upload_bins(bin_dir, id_token)
+    # Step 2: Upload (returns one result dict per batch).
+    upload_results = upload_bins(bin_dir, id_token)
 
-    # Step 3: Poll if async (v2), or use result directly if sync (v1).
-    job_completed = False
-    if "job_id" in upload_result:
-        poll_data = poll_job(upload_result["job_id"], id_token)
-        job_result = poll_data.get("result") or {}
-        # poll_job only returns for completed/partial_failure; failed calls sys.exit.
-        job_completed = poll_data.get("status") in ("completed", "partial_failure")
-    else:
-        # Synchronous v1 response — treat any non-empty reply as success.
-        job_result = upload_result
-        job_completed = bool(upload_result)
+    # Step 3: Poll each batch that returned an async job_id; collect aggregated totals.
+    all_new_convos:     list = []
+    all_errors:         list = []
+    total_failed_segs        = 0
+    all_completed            = True
+
+    for upload_result in upload_results:
+        if "job_id" in upload_result:
+            poll_data  = poll_job(upload_result["job_id"], id_token)
+            job_result = poll_data.get("result") or {}
+            # poll_job only returns for completed/partial_failure; failed calls sys.exit.
+            batch_ok   = poll_data.get("status") in ("completed", "partial_failure")
+        else:
+            # Synchronous v1 response — treat any non-empty reply as success.
+            job_result = upload_result
+            batch_ok   = bool(upload_result)
+
+        all_new_convos    += job_result.get("new_memories", [])
+        all_errors        += job_result.get("errors", [])
+        total_failed_segs += job_result.get("failed_segments", 0)
+        if not batch_ok:
+            all_completed = False
 
     # Step 4: Print summary.
-    new_convos = job_result.get("new_memories", [])
-    errors     = job_result.get("errors", [])
-
     print(f"\n--- Omi Cloud Sync Summary ---")
-    print(f"  New conversations : {len(new_convos)}")
-    print(f"  Failed segments   : {job_result.get('failed_segments', 0)}")
-    if errors:
-        for err in errors:
+    print(f"  New conversations : {len(all_new_convos)}")
+    print(f"  Failed segments   : {total_failed_segs}")
+    if all_errors:
+        for err in all_errors:
             print(f"  [!] {err}")
 
     # Step 5: Cleanup — trust job completion status rather than conversation count.
     # Omi doesn't always populate new_memories in the immediate response; conversations
     # may appear in the app shortly after. Job completion is the authoritative signal.
-    if job_completed:
+    if all_completed:
         cleanup_bins(bin_dir, synced_dir, args.synced_bin_action)
     else:
         print("[!] Job did not complete cleanly — files NOT moved.")
