@@ -143,8 +143,6 @@ TRANSCRIPTION_ENGINE = os.getenv("TRANSCRIPTION_ENGINE", "macwhisper").lower()
 # STARTUP VALIDATION
 # ==========================================
 # Fail fast with a clear message rather than crashing cryptically later.
-if not PENDANT_MAC_ADDRESS:
-    sys.exit("ERROR: PENDANT_MAC_ADDRESS is not set in .env — cannot connect to pendant.")
 if TRANSCRIPTION_ENGINE == "omi_cloud":
     if not OMI_FIREBASE_TOKEN and not OMI_FIREBASE_REFRESH_TOKEN:
         sys.exit(
@@ -322,7 +320,13 @@ async def sync_cycle():
     while True:
         log("Attempting connection to Pendant...")
 
-        cmd = [str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "download.py"), "--address", PENDANT_MAC_ADDRESS]
+        cmd = [
+            str(VENV_PYTHON), "-u", str(SCRIPTS_DIR / "download.py"),
+            "--output-dir", str(DOWNLOAD_DIR),
+            "--log-file", str(BASE_DIR / "limitless_data/logs/limitless_download.log"),
+        ]
+        if PENDANT_MAC_ADDRESS:
+            cmd += ["--address", PENDANT_MAC_ADDRESS]
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,

@@ -133,8 +133,9 @@ LIMITLESS_RX_CHAR_UUID = "632de003-604c-446b-a80f-7963e950f3fb"
 # ==========================================
 # DEFAULT PATHS
 # ==========================================
-DEFAULT_LOG_FILE = Path.home() / "omi/limitless_data/logs/limitless_download.log"
-DEFAULT_OUTPUT_ROOT = Path.home() / "omi/limitless_data/downloads"
+_SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_LOG_FILE = _SCRIPT_DIR.parent / "limitless_data/logs/limitless_download.log"
+DEFAULT_OUTPUT_ROOT = _SCRIPT_DIR.parent / "limitless_data/downloads"
 
 # ==========================================
 # PENDANT AUDIO CONSTANTS
